@@ -1,0 +1,18 @@
+[project]
+name = "crypto_bs"
+version = "0.1.0"
+description = "Python library for pricing coin-settled crypto options"
+authors = [{name="Your Name"}]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21.0",
+    "scipy>=1.7.0",
+    "requests>=2.25.0"
+]
+
+[tool.setuptools]
+packages = ["crypto_bs"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
