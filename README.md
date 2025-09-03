@@ -149,7 +149,7 @@ premium_btc = 0.0123  # premium in BTC
 be = breakeven_price_coin_based(K, premium_btc, 'call')
 print(f"Coin-based breakeven: ${be:.2f}")
 ```
-```
+
 
 ## 📊 API Reference
 
