@@ -178,3 +178,50 @@ def test_breakeven_coin_based():
     # Put option breakeven
     be_put = breakeven_price(strike, premium_btc, 'put')
     assert be_put == strike - premium_btc
+
+
+if __name__ == "__main__":
+    # Run all tests when file is executed directly
+    import sys
+    
+    test_functions = [
+        test_call_price_positive,
+        test_put_price_positive,
+        test_call_delta,
+        test_put_delta,
+        test_gamma,
+        test_vega,
+        test_theta_call,
+        test_theta_put,
+        test_rho,
+        test_breakeven_call,
+        test_breakeven_put,
+        test_coin_based_pricing,
+        test_quick_coin_based_pricing,
+        test_advanced_greeks_calculator,
+        test_coin_based_vs_standard_pricing,
+        test_breakeven_coin_based
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    print("Running crypto_bs tests...")
+    print("=" * 50)
+    
+    for test_func in test_functions:
+        try:
+            test_func()
+            print(f"✅ {test_func.__name__}")
+            passed += 1
+        except Exception as e:
+            print(f"❌ {test_func.__name__}: {e}")
+            failed += 1
+    
+    print("=" * 50)
+    print(f"Results: {passed} passed, {failed} failed")
+    
+    if failed > 0:
+        sys.exit(1)
+    else:
+        print("🎉 All tests passed!")

@@ -189,9 +189,27 @@ print(f"Coin-based breakeven: ${be:.2f}")
 - **Model Validation**: Compare theoretical prices with exchange data
 - **Breakeven Analysis**: Determine profitable exercise points
 
-## 📄 License
+## 🧪 Testing
 
-MIT License - see LICENSE file for details.
+Run the test suite using pytest:
+
+```bash
+# Using pytest (recommended)
+pytest tests/ -v
+
+# Or using the test runner script
+python run_tests.py
+
+# Or run tests directly
+python tests/test_pricing.py
+```
+
+All 16 tests should pass, covering:
+- Basic Black-76 pricing
+- Greeks calculations
+- Coin-based pricing
+- Advanced portfolio analysis
+- Breakeven calculations
 
 ---
 
