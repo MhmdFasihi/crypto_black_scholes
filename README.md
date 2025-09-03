@@ -44,8 +44,16 @@ This package implements **three pricing approaches** optimized for cryptocurrenc
 
 ## 📈 Installation
 
+Install from PyPI (package: `crypto-bs`, module import: `crypto_bs`):
+
 ```bash
-pip install .
+pip install -U crypto-bs
+```
+
+Then import the library as:
+
+```python
+import crypto_bs
 ```
 
 ## 🎯 Quick Start
