@@ -135,6 +135,7 @@ validation = validate_deribit_pricing(
     option_type='call'
 )
 print(f"Model vs Exchange difference: {validation['price_difference_btc']:.6f} BTC")
+```
 
 ### Breakeven for Coin-Settled Options
 
