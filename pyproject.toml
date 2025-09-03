@@ -27,11 +27,10 @@ dependencies = [
     "pandas>=1.3.0"
 ]
 
-urls = {
-    "Homepage" = "https://github.com/MhmdFasihi/crypto_black_scholes",
-    "Repository" = "https://github.com/MhmdFasihi/crypto_black_scholes",
-    "Issues" = "https://github.com/MhmdFasihi/crypto_black_scholes/issues"
-}
+[project.urls]
+Homepage = "https://github.com/MhmdFasihi/crypto_black_scholes"
+Repository = "https://github.com/MhmdFasihi/crypto_black_scholes"
+Issues = "https://github.com/MhmdFasihi/crypto_black_scholes/issues"
 
 [tool.setuptools]
 packages = ["crypto_bs"]
