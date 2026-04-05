@@ -1,4 +1,4 @@
-from .pricing import price_option
+from .pricing import price_option, price_options_vectorized
 from .greeks import delta, gamma, vega, theta, rho
 from .utils import breakeven_price, breakeven_price_coin_based
 from .data_fetch import get_btc_forward_price, get_option_data, get_available_instruments, get_btc_price, get_btc_volatility
@@ -15,7 +15,8 @@ from .greeks_calculator import (
 
 __all__ = [
     # Basic functions
-    'price_option', 'delta', 'gamma', 'vega', 'theta', 'rho', 'breakeven_price',
+    'price_option', 'price_options_vectorized', 'delta', 'gamma', 'vega', 'theta', 'rho',
+    'breakeven_price',
     'breakeven_price_coin_based',
     'get_btc_forward_price', 'get_option_data', 'get_available_instruments',
     'get_btc_price', 'get_btc_volatility',

@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GreeksProfile:
     """Complete Greeks profile for an option or portfolio."""
-    delta: float
+    delta_usd: float
+    delta_coin: float
     gamma: float
     theta: float
     vega: float
@@ -38,7 +39,9 @@ class GreeksProfile:
     def to_dict(self) -> Dict[str, float]:
         """Convert to dictionary."""
         return {
-            'delta': self.delta,
+            'delta_usd': self.delta_usd,
+            'delta_coin': self.delta_coin,
+            'delta': self.delta_usd,
             'gamma': self.gamma,
             'theta': self.theta,
             'vega': self.vega,
@@ -125,7 +128,8 @@ class GreeksCalculator:
         second_order = self._calculate_second_order_greeks(params) if params.time_to_maturity > 0 else {}
         
         return GreeksProfile(
-            delta=pricing.delta,
+            delta_usd=pricing.delta_usd,
+            delta_coin=pricing.delta_coin,
             gamma=pricing.gamma,
             theta=pricing.theta,
             vega=pricing.vega,
@@ -165,15 +169,15 @@ class GreeksCalculator:
             if params.time_to_maturity > eps_time:
                 params_later = OptionParameters(**{**params.__dict__, 
                                                'time_to_maturity': params.time_to_maturity - eps_time})
-                delta_later = self.bs_model.calculate_option_price(params_later).delta
-                delta_now = self.bs_model.calculate_option_price(params).delta
+                delta_later = self.bs_model.calculate_option_price(params_later).delta_usd
+                delta_now = self.bs_model.calculate_option_price(params).delta_usd
                 second_order['charm'] = -(delta_later - delta_now) / eps_time
             
             # Vanna: Cross-derivative of Delta with respect to volatility
             params_vol_up = OptionParameters(**{**params.__dict__, 
                                             'volatility': params.volatility + eps_vol})
-            delta_vol_up = self.bs_model.calculate_option_price(params_vol_up).delta
-            delta_base = self.bs_model.calculate_option_price(params).delta
+            delta_vol_up = self.bs_model.calculate_option_price(params_vol_up).delta_usd
+            delta_base = self.bs_model.calculate_option_price(params).delta_usd
             second_order['vanna'] = (delta_vol_up - delta_base) / eps_vol
             
             # Vomma: Rate of change of Vega with respect to volatility
@@ -231,7 +235,7 @@ class GreeksCalculator:
             quantity = position['quantity']
             
             # Aggregate Greeks
-            total_delta += pricing.delta * quantity
+            total_delta += pricing.delta_usd * quantity
             total_gamma += pricing.gamma * quantity
             total_theta += pricing.theta * quantity
             total_vega += pricing.vega * quantity
@@ -247,8 +251,11 @@ class GreeksCalculator:
             # Aggregate by underlying
             underlying = position.get('underlying', 'UNKNOWN')
             if underlying not in by_underlying:
-                by_underlying[underlying] = {'delta': 0, 'gamma': 0, 'theta': 0, 'vega': 0, 'rho': 0}
-            by_underlying[underlying]['delta'] += pricing.delta * quantity
+                by_underlying[underlying] = {
+                    'delta_usd': 0.0, 'delta_coin': 0.0, 'gamma': 0, 'theta': 0, 'vega': 0, 'rho': 0
+                }
+            by_underlying[underlying]['delta_usd'] += pricing.delta_usd * quantity
+            by_underlying[underlying]['delta_coin'] += pricing.delta_coin * quantity
             by_underlying[underlying]['gamma'] += pricing.gamma * quantity
             by_underlying[underlying]['theta'] += pricing.theta * quantity
             by_underlying[underlying]['vega'] += pricing.vega * quantity
@@ -257,8 +264,11 @@ class GreeksCalculator:
             # Aggregate by expiry
             expiry_key = f"{int(position['time_to_maturity'] * 365)}d"
             if expiry_key not in by_expiry:
-                by_expiry[expiry_key] = {'delta': 0, 'gamma': 0, 'theta': 0, 'vega': 0, 'rho': 0}
-            by_expiry[expiry_key]['delta'] += pricing.delta * quantity
+                by_expiry[expiry_key] = {
+                    'delta_usd': 0.0, 'delta_coin': 0.0, 'gamma': 0, 'theta': 0, 'vega': 0, 'rho': 0
+                }
+            by_expiry[expiry_key]['delta_usd'] += pricing.delta_usd * quantity
+            by_expiry[expiry_key]['delta_coin'] += pricing.delta_coin * quantity
             by_expiry[expiry_key]['gamma'] += pricing.gamma * quantity
             by_expiry[expiry_key]['theta'] += pricing.theta * quantity
             by_expiry[expiry_key]['vega'] += pricing.vega * quantity
@@ -272,15 +282,23 @@ class GreeksCalculator:
         # Convert aggregated dicts to GreeksProfile objects
         by_underlying_profiles = {
             k: GreeksProfile(
-                delta=v['delta'], gamma=v['gamma'], theta=v['theta'],
-                vega=v['vega'], rho=v['rho']
+                delta_usd=v['delta_usd'],
+                delta_coin=v['delta_coin'],
+                gamma=v['gamma'],
+                theta=v['theta'],
+                vega=v['vega'],
+                rho=v['rho'],
             ) for k, v in by_underlying.items()
         }
-        
+
         by_expiry_profiles = {
             k: GreeksProfile(
-                delta=v['delta'], gamma=v['gamma'], theta=v['theta'],
-                vega=v['vega'], rho=v['rho']
+                delta_usd=v['delta_usd'],
+                delta_coin=v['delta_coin'],
+                gamma=v['gamma'],
+                theta=v['theta'],
+                vega=v['vega'],
+                rho=v['rho'],
             ) for k, v in by_expiry.items()
         }
         
@@ -555,6 +573,6 @@ if __name__ == "__main__":
     
     print("\n   Greeks by Underlying:")
     for underlying, greeks in risk_analysis['by_underlying'].items():
-        print(f"      {underlying}: Δ={greeks['delta']:.4f}, Γ={greeks['gamma']:.6f}")
+        print(f"      {underlying}: Δ_usd={greeks['delta_usd']:.4f}, Γ={greeks['gamma']:.6f}")
     
     print("\n✅ Greeks Calculator ready for Qortfolio V2!")

@@ -1,70 +1,73 @@
 import requests
-import json
 
 DERIBIT_API_BASE = "https://www.deribit.com/api/v2/public/"
+REQUEST_TIMEOUT = 10
 
-def get_btc_forward_price():
+
+def get_btc_forward_price() -> float:
     """
     Fetch BTC perpetual price from Deribit as a proxy for forward price.
     Returns the mark price in USD.
     """
     url = f"{DERIBIT_API_BASE}ticker?instrument_name=BTC-PERPETUAL"
-    response = requests.get(url)
+    response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
     data = response.json()
     if data['result']:
         return data['result']['mark_price']
-    else:
-        raise ValueError("Failed to fetch BTC price from Deribit")
+    raise ValueError("Failed to fetch BTC price from Deribit")
 
-def get_option_data(instrument_name):
+
+def get_option_data(instrument_name: str) -> dict:
     """
     Fetch option data from Deribit for a specific instrument.
     instrument_name example: 'BTC-30SEP25-40000-C' for call option.
     Returns a dict with price, implied_volatility, etc.
     """
     url = f"{DERIBIT_API_BASE}ticker?instrument_name={instrument_name}"
-    response = requests.get(url)
+    response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
     data = response.json()
     if data['result']:
         result = data['result']
         return {
             'mark_price': result['mark_price'],
-            'implied_volatility': result['mark_iv'] / 100,  # Deribit returns IV as percentage
+            'implied_volatility': result['mark_iv'] / 100,
             'bid_price': result['best_bid_price'],
             'ask_price': result['best_ask_price'],
             'underlying_price': result['underlying_price']
         }
-    else:
-        raise ValueError(f"Failed to fetch data for {instrument_name}")
+    raise ValueError(f"Failed to fetch data for {instrument_name}")
 
-def get_available_instruments(currency='BTC', kind='option'):
-    """
-    Fetch list of available option instruments for BTC.
-    """
+
+def get_available_instruments(currency: str = 'BTC', kind: str = 'option') -> list:
+    """Fetch list of available option instruments."""
     url = f"{DERIBIT_API_BASE}get_instruments?currency={currency}&kind={kind}&expired=false"
-    response = requests.get(url)
+    response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
     data = response.json()
     if data['result']:
         return [inst['instrument_name'] for inst in data['result']]
-    else:
-        raise ValueError("Failed to fetch instruments")
+    raise ValueError("Failed to fetch instruments")
 
-# Keep the old function for backward compatibility or general use
-def get_btc_price():
-    """
-    Fetch current BTC price from CoinGecko API.
-    Returns the price in USD.
-    """
+
+def get_btc_price() -> float:
+    """Fetch current BTC price in USD from CoinGecko."""
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-    response = requests.get(url)
+    response = requests.get(url, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
     data = response.json()
     return data['bitcoin']['usd']
 
-def get_btc_volatility():
+
+def get_btc_volatility() -> float:
     """
-    Placeholder for volatility calculation.
-    In a real implementation, this would fetch historical data and calculate implied volatility.
-    For now, returns a sample value.
+    Historical / realized volatility from market data is not implemented in this release.
+
+    Raises:
+        NotImplementedError: Always, until a dedicated historical_vol module ships.
     """
-    # This is a placeholder - real implementation would require historical data
-    return 0.5  # Sample volatility
+    raise NotImplementedError(
+        "get_btc_volatility is not implemented. Use your own realized vol from returns "
+        "or an external data source; a historical_vol helper is planned for a future release."
+    )

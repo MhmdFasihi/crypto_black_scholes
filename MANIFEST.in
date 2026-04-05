@@ -1,0 +1,7 @@
+include README.md
+include CHANGELOG.md
+include LICENSE
+include pyproject.toml
+recursive-include crypto_bs *.py
+recursive-include tests *.py
+recursive-include examples *.py

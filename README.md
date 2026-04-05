@@ -1,91 +1,83 @@
 # Crypto Black-Scholes
 
-A comprehensive Python library for pricing coin-settled cryptocurrency options using advanced Black-Scholes and Black-76 models.
+**Version 0.2.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, and Deribit-oriented helpers.
 
-## 🚀 Features
+See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 
-- **Multiple Pricing Models**: Black-Scholes, Black-76, and coin-based adaptations
-- **Complete Greeks Calculation**: Delta, Gamma, Theta, Vega, Rho + second-order Greeks (Speed, Charm, Vanna, Vomma)
-- **Portfolio Risk Analysis**: Multi-position portfolio Greeks and risk metrics
-- **Real-time Data Integration**: Live data from Deribit exchange
-- **Coin-Settled Options Support**: Premiums and payoffs in cryptocurrency units
-- **Breakeven Analysis**: Accurate breakeven calculations for coin-settled options
-- **Implied Volatility**: Calculate IV from market prices
-- **Advanced Validation**: Compare model prices with exchange data
+## Features
 
-## 📊 Model Details
+- **Pricing** — Black-76 (forward / coin premium), enhanced Black-Scholes with USD vs coin-denominated premium
+- **Greeks** — Delta (USD vs coin premium), gamma, theta, vega, rho; second-order Greeks (speed, charm, vanna, vomma) via finite differences in `GreeksCalculator`
+- **Portfolio** — Multi-position Greeks, risk metrics, gamma exposure profile
+- **Data** — Deribit REST helpers (timeouts on HTTP calls)
+- **IV** — Implied vol from market price (Brent’s method), intrinsic and bounds checks
+- **Vectorized chain pricing** — `price_options_vectorized` for many strikes / expiries at once
+- **Breakeven** — USD and coin-settled breakeven helpers
 
-This package implements **three pricing approaches** optimized for cryptocurrency options:
+## Model overview
 
-### 1. Black-76 Model (Primary for Coin-Settled)
-- Designed for futures options (perfect for coin-settled crypto options)
-- Uses forward/futures price instead of spot price
-- No risk-free rate discounting (r=0)
-- Premium and payoff in cryptocurrency units
+1. **Black-76 (module-level `price_option`)** — Forward `F`, undiscounted coin premium; suited to Deribit-style quoting.
+2. **`BlackScholesModel`** — Spot-based Merton BS; **`is_coin_based=True`** for premium as fraction of spot; exposes **`delta_usd`** (hedge delta) and **`delta_coin`** (premium sensitivity to spot).
+3. **Portfolio** — Aggregations use **USD delta** per position for `total_delta` and dollar exposures.
 
-### 2. Enhanced Black-Scholes
-- Standard Black-Scholes with coin-based adaptations
-- Supports both USD and cryptocurrency denominated options
-- Advanced Greeks with second-order derivatives
-
-### 3. Portfolio-Level Analysis
-- Aggregate Greeks across multiple positions
-- Risk metrics including gamma exposure and pin risk
-- Greeks breakdown by underlying asset and expiry
-
-## 💰 Coin-Settled Options Focus
-
-**Key Differences from Standard Options:**
-- **Premium**: Paid in cryptocurrency (e.g., 0.1 BTC for a $120K BTC option)
-- **Settlement**: Payoff delivered in cryptocurrency
-- **Pricing**: Uses Black-76 model with forward prices
-- **Greeks**: Adjusted for cryptocurrency denomination
-- **Breakeven**: Calculated in USD terms but based on crypto premium
-
-## 📈 Installation
-
-Install from PyPI (package: `crypto-bs`, module import: `crypto_bs`):
+## Installation
 
 ```bash
 pip install -U crypto-bs
 ```
 
-Then import the library as:
+Import as:
 
 ```python
 import crypto_bs
 ```
 
-## 🎯 Quick Start
+Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests` (see `pyproject.toml`).
+
+## Upgrading from 0.1.x
+
+- Replace **`result.delta`** with **`result.delta_usd`** (hedging / notional delta) and/or **`result.delta_coin`** (academic / premium-in-coin sensitivity).
+- Dicts from **`price_coin_based_option`** / **`validate_deribit_pricing`**: use **`delta_usd`** / **`delta_coin`** instead of **`delta`**.
+- **`get_btc_volatility()`** no longer returns `0.5`; it raises **`NotImplementedError`** until a realized-vol module exists.
+- Optional: add **`pytest`** to your environment for the test suite (`pip install pytest`).
+
+## Quick start
 
 ```python
-from crypto_bs import price_option, delta, gamma, breakeven_price, breakeven_price_coin_based
+from crypto_bs import price_option, delta, gamma, price_options_vectorized
+import numpy as np
 
-# Basic Black-76 pricing for coin-settled options
+# Black-76 coin premium
 price = price_option(F=110000, K=105000, T=1/365, sigma=0.6, option_type='call')
-print(f"Option Price: {price:.6f} BTC")
+print(f"Premium (coin): {price:.6f}")
 
-# Calculate Greeks
 d = delta(110000, 105000, 1/365, 0.6, 'call')
 g = gamma(110000, 105000, 1/365, 0.6)
 
-# Breakeven analysis (USD premium)
-be_usd = breakeven_price(105000, 500, 'call')
-print(f"Breakeven (USD premium): ${be_usd:.2f}")
-
-# Breakeven analysis (coin-settled premium)
-be_coin = breakeven_price_coin_based(105000, price, 'call')
-print(f"Breakeven (coin-based): ${be_coin:.2f}")
+# Whole chain in one call
+K = np.array([100000.0, 105000.0, 110000.0])
+T = np.full(3, 1 / 365)
+sig = np.full(3, 0.6)
+types = np.array(["call", "call", "put"])
+premiums = price_options_vectorized(110000, K, T, sig, types)
 ```
 
-## 🔧 Advanced Usage
+### Breakeven
 
-### Coin-Based Pricing with Full Analysis
+```python
+from crypto_bs import breakeven_price, breakeven_price_coin_based
+
+be_usd = breakeven_price(105000, 500, 'call')
+be_coin = breakeven_price_coin_based(105000, price, 'call')
+```
+
+## Advanced usage
+
+### Coin-based `BlackScholesModel`
 
 ```python
 from crypto_bs import BlackScholesModel, OptionParameters, OptionType
 
-# Advanced pricing with coin-based support
 bs_model = BlackScholesModel()
 params = OptionParameters(
     spot_price=110000,
@@ -93,132 +85,103 @@ params = OptionParameters(
     time_to_maturity=1/365,
     volatility=0.6,
     option_type=OptionType.CALL,
-    is_coin_based=True  # Key for coin-settled options
+    is_coin_based=True,
 )
 
 result = bs_model.calculate_option_price(params)
-print(f"Coin Price: {result.coin_based_price:.6f} BTC")
-print(f"USD Equivalent: ${result.usd_price:.2f}")
-print(f"Delta: {result.delta:.6f}")
+print(f"Coin premium: {result.coin_based_price:.6f}")
+print(f"USD equivalent: ${result.usd_price:.2f}")
+print(f"Delta USD (hedge): {result.delta_usd:.6f}")
+print(f"Delta coin premium: {result.delta_coin:.9f}")
 ```
 
-### Portfolio Risk Analysis
+### Portfolio risk
 
 ```python
 from crypto_bs import analyze_portfolio_risk
 
 portfolio = [
     {
-        'quantity': 10,
-        'spot_price': 110000,
-        'strike_price': 105000,
-        'time_to_maturity': 1/365,
-        'volatility': 0.6,
-        'option_type': 'call',
-        'underlying': 'BTC',
-        'is_coin_based': True
+        "quantity": 10,
+        "spot_price": 110000,
+        "strike_price": 105000,
+        "time_to_maturity": 1/365,
+        "volatility": 0.6,
+        "option_type": "call",
+        "underlying": "BTC",
+        "is_coin_based": True,
     }
 ]
 
-risk_analysis = analyze_portfolio_risk(portfolio)
-print("Portfolio Delta:", risk_analysis['portfolio_summary']['total_delta'])
-print("Gamma Exposure:", risk_analysis['risk_metrics']['gamma_exposure'])
+risk = analyze_portfolio_risk(portfolio)
+print("Portfolio delta (USD):", risk["portfolio_summary"]["total_delta"])
+print("Gamma exposure:", risk["risk_metrics"]["gamma_exposure"])
 ```
 
-### Real-Time Deribit Integration
+### Deribit helpers
 
 ```python
 from crypto_bs import get_btc_forward_price, get_option_data, validate_deribit_pricing
 
-# Get live data
 F = get_btc_forward_price()
-option_data = get_option_data('BTC-3SEP25-105000-C')
+option_data = get_option_data("BTC-3SEP25-105000-C")
 
-# Validate model against exchange
 validation = validate_deribit_pricing(
-    deribit_price_btc=option_data['mark_price'],
+    deribit_price_btc=option_data["mark_price"],
     spot=F,
     strike=105000,
     time_to_maturity=1/365,
-    option_type='call'
+    option_type="call",
 )
-print(f"Model vs Exchange difference: {validation['price_difference_btc']:.6f} BTC")
+print("IV:", validation["implied_volatility"])
+print("Delta USD:", validation["delta_usd"])
 ```
 
-### Breakeven for Coin-Settled Options
+Requests use a **10-second timeout**; failures surface as `requests` exceptions or `ValueError` from the API helpers.
 
-For coin-settled options where the premium is paid in coin units (e.g., BTC):
+## API reference (summary)
 
-```python
-from crypto_bs import breakeven_price_coin_based
+| Symbol | Role |
+|--------|------|
+| `price_option`, `black_76_call`, `black_76_put` | Scalar Black-76 coin premium |
+| `price_options_vectorized` | Vectorized chain pricing |
+| `delta`, `gamma`, `vega`, `theta`, `rho` | Black-76 Greeks on forward `F`; `rho(..., risk_free_rate=0)` |
+| `breakeven_price`, `breakeven_price_coin_based` | Breakeven spot levels |
+| `BlackScholesModel`, `OptionParameters`, `OptionPricing` | Full pricing + Greeks; **`OptionPricing.delta_usd` / `delta_coin`** |
+| `calculate_implied_volatility` | IV search; default max vol **20.0**; validates vs intrinsic |
+| `GreeksCalculator`, `calculate_option_greeks`, `analyze_portfolio_risk` | Profiles and portfolio |
+| `get_btc_forward_price`, `get_option_data`, `get_available_instruments`, `get_btc_price` | Market data |
+| `get_btc_volatility` | **Not implemented** — raises `NotImplementedError` |
 
-K = 105000
-premium_btc = 0.0123  # premium in BTC
+Full signatures and defaults are in the source docstrings.
 
-be = breakeven_price_coin_based(K, premium_btc, 'call')
-print(f"Coin-based breakeven: ${be:.2f}")
-```
+## Validation (example)
 
+Using real Deribit-style numbers, model vs mark can be on the order of **~1%** in BTC premium depending on mark, forward, and IV; use `validate_deribit_pricing` and live `get_option_data` for your own checks.
 
-## 📊 API Reference
-
-### Core Functions
-- `price_option(F, K, T, sigma, option_type)` - Basic Black-76 pricing
-- `delta(F, K, T, sigma, option_type)` - Option delta
-- `gamma(F, K, T, sigma)` - Option gamma
-- `vega(F, K, T, sigma)` - Option vega
-- `theta(F, K, T, sigma, option_type)` - Option theta
-- `breakeven_price(K, premium, option_type)` - Breakeven calculation
-
-### Advanced Classes
-- `BlackScholesModel` - Advanced pricing with coin-based support
-- `GreeksCalculator` - Portfolio-level Greeks and risk analysis
-- `OptionParameters` - Structured option parameters
-- `PortfolioGreeks` - Portfolio Greeks aggregation
-
-### Data Integration
-- `get_btc_forward_price()` - BTC perpetual price from Deribit
-- `get_option_data(instrument)` - Option data from Deribit
-- `get_available_instruments()` - List available options
-
-## ✅ Validation Results
-
-**Real Deribit Data Test (Sept 2025):**
-- **Exchange Price**: 0.0535 BTC
-- **Model Price**: 0.0542 BTC
-- **Difference**: 0.0007 BTC (1.3% relative difference)
-- **Implied Volatility Match**: Within market expectations
-
-## 🎯 Use Cases
-
-- **Crypto Options Trading**: Price and risk-manage BTC/ETH options
-- **Portfolio Hedging**: Calculate Greeks for complex option portfolios
-- **Risk Analysis**: Assess gamma exposure and pin risk
-- **Model Validation**: Compare theoretical prices with exchange data
-- **Breakeven Analysis**: Determine profitable exercise points
-
-## 🧪 Testing
-
-Run the test suite using pytest:
+## Testing
 
 ```bash
-# Using pytest (recommended)
+# From repo root (recommended)
 pytest tests/ -v
 
-# Or using the test runner script
-python run_tests.py
+# With conda
+conda activate crypto-option
+cd /path/to/crypto_bs_project
+PYTHONPATH=. pytest tests/ -v
 
-# Or run tests directly
-python tests/test_pricing.py
+# Wrapper script
+python run_tests.py
 ```
 
-All 16 tests should pass, covering:
-- Basic Black-76 pricing
-- Greeks calculations
-- Coin-based pricing
-- Advanced portfolio analysis
-- Breakeven calculations
+The suite includes **23** tests (pricing, Greeks, coin gamma, IV, vectorized parity, put–call parity, and data stubs). Install **pytest** if it is not already in the environment.
+
+## License and links
+
+- License: see **LICENSE** in the repository.
+- Repository: [github.com/MhmdFasihi/crypto_black_scholes](https://github.com/MhmdFasihi/crypto_black_scholes)
+- **Changes / migration:** [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-**Built for cryptocurrency options traders who need accurate, coin-settled pricing models.**
+Built for cryptocurrency options workflows that need **coin-settled** premiums, explicit **hedge delta vs coin-premium delta**, and **portfolio** Greeks.

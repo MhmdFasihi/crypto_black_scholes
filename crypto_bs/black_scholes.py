@@ -57,7 +57,8 @@ class OptionParameters:
 class OptionPricing:
     """Results from option pricing calculations."""
     option_price: float
-    delta: float
+    delta_usd: float  # ∂V_usd/∂S — use for delta hedging (notional in underlying)
+    delta_coin: float  # ∂(V_usd/S)/∂S — sensitivity of coin-denominated premium to spot
     gamma: float
     theta: float
     vega: float
@@ -79,12 +80,12 @@ class BlackScholesModel:
     - We need to adjust the standard formulas
     """
     
-    def __init__(self, min_time_to_maturity: float = 1/365):
+    def __init__(self, min_time_to_maturity: float = 1 / 8760):
         """
         Initialize Black-Scholes model.
         
         Args:
-            min_time_to_maturity: Minimum time to maturity (default 1 day)
+            min_time_to_maturity: Floor for T in years (default 1 hour) to avoid div-by-zero
         """
         self.min_time_to_maturity = min_time_to_maturity
         self.logger = logging.getLogger(__name__)
@@ -142,7 +143,8 @@ class BlackScholesModel:
         
         return OptionPricing(
             option_price=option_price,
-            delta=greeks['delta'],
+            delta_usd=greeks['delta_usd'],
+            delta_coin=greeks['delta_coin'],
             gamma=greeks['gamma'],
             theta=greeks['theta'],
             vega=greeks['vega'],
@@ -200,27 +202,23 @@ class BlackScholesModel:
         sqrt_T = np.sqrt(T)
         pdf_d1 = norm.pdf(d1)
         
-        # Delta
+        # USD option value and delta (Merton Black-Scholes on spot)
         if option_type.lower() == 'call':
+            V_usd = S * np.exp(-q * T) * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
             delta_usd = np.exp(-q * T) * norm.cdf(d1)
         else:
+            V_usd = K * np.exp(-r * T) * norm.cdf(-d2) - S * np.exp(-q * T) * norm.cdf(-d1)
             delta_usd = -np.exp(-q * T) * norm.cdf(-d1)
-        
-        if is_coin_based:
-            # Adjust delta for coin-based options
-            # Delta_coin = ∂(Price_coin)/∂S = ∂(Price_usd/S)/∂S
-            if option_type.lower() == 'call':
-                greeks['delta'] = (K * np.exp(-r * T) * norm.cdf(d2)) / (S**2)
-            else:
-                greeks['delta'] = -(K * np.exp(-r * T) * norm.cdf(-d2)) / (S**2)
-        else:
-            greeks['delta'] = delta_usd
-        
-        # Gamma (needs adjustment for coin-based)
+
+        # Coin premium P_coin = V_usd / S  =>  ∂P_coin/∂S = (Δ_usd·S − V_usd) / S²
+        delta_coin = (delta_usd * S - V_usd) / (S**2)
+        greeks['delta_usd'] = delta_usd
+        greeks['delta_coin'] = delta_coin
+
+        # Gamma: USD gamma; coin gamma uses Δ_usd in the cross term (not Δ_coin)
         gamma_usd = np.exp(-q * T) * pdf_d1 / (S * σ * sqrt_T)
         if is_coin_based:
-            # Gamma for coin-based options requires second derivative adjustment
-            greeks['gamma'] = gamma_usd / S - 2 * greeks['delta'] / S
+            greeks['gamma'] = gamma_usd / S - 2 * delta_usd / (S**2)
         else:
             greeks['gamma'] = gamma_usd
         
@@ -278,21 +276,35 @@ class BlackScholesModel:
         if params.volatility <= 0:
             raise ValueError("Volatility must be positive")
     
+    def _intrinsic_usd(self, S: float, K: float, option_type: str) -> float:
+        if option_type.lower() == 'call':
+            return max(S - K, 0.0)
+        return max(K - S, 0.0)
+
     def calculate_implied_volatility(self, market_price: float, params: OptionParameters,
-                                    min_vol: float = 0.01, max_vol: float = 5.0) -> float:
+                                    min_vol: float = 0.01, max_vol: float = 20.0) -> float:
         """
-        Calculate implied volatility using Newton-Raphson method.
-        
+        Implied volatility via Brent's method on price error.
+
         Args:
-            market_price: Observed market price
-            params: Option parameters (without volatility)
-            min_vol: Minimum volatility bound
-            max_vol: Maximum volatility bound
-            
-        Returns:
-            Implied volatility
+            market_price: Observed premium (USD if not coin-based, coin fraction if coin-based)
+            params: Option parameters (volatility is ignored; replaced during search)
+            min_vol: Lower search bound (annualized vol)
+            max_vol: Upper search bound (default 20.0 = 2000% annualized for crypto extremes)
         """
-        def objective(vol):
+        if market_price <= 0:
+            raise ValueError("market_price must be positive")
+
+        S, K = params.spot_price, params.strike_price
+        opt = params.option_type.value if isinstance(params.option_type, OptionType) else params.option_type
+        intrinsic_usd = self._intrinsic_usd(S, K, opt)
+        intrinsic = intrinsic_usd / S if params.is_coin_based else intrinsic_usd
+        if market_price + 1e-14 < intrinsic:
+            raise ValueError(
+                f"market_price ({market_price}) is below intrinsic value ({intrinsic})"
+            )
+
+        def objective(vol: float) -> float:
             params_copy = OptionParameters(
                 spot_price=params.spot_price,
                 strike_price=params.strike_price,
@@ -305,16 +317,15 @@ class BlackScholesModel:
             )
             theoretical_price = self.calculate_option_price(params_copy).option_price
             return theoretical_price - market_price
-        
+
         try:
-            # Use Brent's method for robustness
-            iv = brentq(objective, min_vol, max_vol, xtol=1e-6)
-            return iv
+            return brentq(objective, min_vol, max_vol, xtol=1e-6)
         except ValueError:
-            # If Brent's method fails, try minimize_scalar
-            result = minimize_scalar(lambda v: abs(objective(v)), 
-                                    bounds=(min_vol, max_vol), 
-                                    method='bounded')
+            result = minimize_scalar(
+                lambda v: abs(objective(v)),
+                bounds=(min_vol, max_vol),
+                method='bounded',
+            )
             return result.x
 
 
@@ -365,7 +376,8 @@ def price_coin_based_option(spot: float, strike: float, time_to_maturity: float,
     return {
         'coin_price': result.coin_based_price,
         'usd_price': result.usd_price,
-        'delta': result.delta,
+        'delta_usd': result.delta_usd,
+        'delta_coin': result.delta_coin,
         'gamma': result.gamma,
         'theta': result.theta,
         'vega': result.vega,
@@ -414,7 +426,8 @@ def validate_deribit_pricing(deribit_price_btc: float, spot: float, strike: floa
         'theoretical_price_btc': theoretical.coin_based_price,
         'theoretical_price_usd': theoretical.usd_price,
         'price_difference_btc': abs(deribit_price_btc - theoretical.coin_based_price),
-        'delta': theoretical.delta,
+        'delta_usd': theoretical.delta_usd,
+        'delta_coin': theoretical.delta_coin,
         'gamma': theoretical.gamma
     }
 
@@ -444,7 +457,7 @@ if __name__ == "__main__":
     result = bs_model.calculate_option_price(params)
     print(f"   USD Price: ${result.usd_price:.2f}")
     print(f"   BTC Equivalent: {result.coin_based_price:.6f} BTC")
-    print(f"   Delta: {result.delta:.4f}")
+    print(f"   Delta (USD): {result.delta_usd:.4f}")
     print(f"   Gamma: {result.gamma:.6f}")
     
     # Example 2: Coin-based option (Deribit style)
@@ -453,7 +466,8 @@ if __name__ == "__main__":
     result = bs_model.calculate_option_price(params)
     print(f"   BTC Price: {result.coin_based_price:.6f} BTC")
     print(f"   USD Equivalent: ${result.usd_price:.2f}")
-    print(f"   Delta (coin-based): {result.delta:.6f}")
+    print(f"   Delta (USD, hedge): {result.delta_usd:.6f}")
+    print(f"   Delta (coin premium): {result.delta_coin:.9f}")
     print(f"   Gamma (coin-based): {result.gamma:.9f}")
     
     # Example 3: Quick pricing function
