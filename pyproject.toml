@@ -1,6 +1,6 @@
 [project]
 name = "crypto_bs"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python library for pricing coin-settled crypto options"
 authors = [{name = "Seyed Mohammad Hossein Fasihi", email = "mhmd.fasihi@gmail.com"}]
 requires-python = ">=3.10"

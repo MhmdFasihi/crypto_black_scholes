@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 0.2.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, and Deribit-oriented helpers.
+**Version 0.3.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, and historical volatility estimators.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 
@@ -13,6 +13,7 @@ See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 - **IV** — Implied vol from market price (Brent’s method), intrinsic and bounds checks
 - **Vectorized chain pricing** — `price_options_vectorized` for many strikes / expiries at once
 - **Breakeven** — USD and coin-settled breakeven helpers
+- **Historical volatility** — Close-to-close, Parkinson, Rogers-Satchell, Yang-Zhang estimators
 
 ## Model overview
 
@@ -38,7 +39,7 @@ Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests` (see `pyproject.
 
 - Replace **`result.delta`** with **`result.delta_usd`** (hedging / notional delta) and/or **`result.delta_coin`** (academic / premium-in-coin sensitivity).
 - Dicts from **`price_coin_based_option`** / **`validate_deribit_pricing`**: use **`delta_usd`** / **`delta_coin`** instead of **`delta`**.
-- **`get_btc_volatility()`** no longer returns `0.5`; it raises **`NotImplementedError`** until a realized-vol module exists.
+- **`get_btc_volatility()`** remains unimplemented in `data_fetch`; use `crypto_bs.historical_vol` functions for realized volatility from OHLC data.
 - Optional: add **`pytest`** to your environment for the test suite (`pip install pytest`).
 
 ## Quick start
@@ -139,6 +140,23 @@ print("Delta USD:", validation["delta_usd"])
 
 Requests use a **10-second timeout**; failures surface as `requests` exceptions or `ValueError` from the API helpers.
 
+### Historical volatility
+
+```python
+import pandas as pd
+from crypto_bs import close_to_close_hv, parkinson_hv, yang_zhang_hv
+
+# Example OHLC arrays as pandas Series
+close = pd.Series([100, 102, 101, 104, 103, 106, 108])
+high = close * 1.01
+low = close * 0.99
+open_ = close.shift(1).fillna(close.iloc[0])
+
+hv_cc = close_to_close_hv(close, window=5)
+hv_parkinson = parkinson_hv(high, low, window=5)
+hv_yz = yang_zhang_hv(open_, high, low, close, window=5)
+```
+
 ## API reference (summary)
 
 | Symbol | Role |
@@ -152,6 +170,7 @@ Requests use a **10-second timeout**; failures surface as `requests` exceptions 
 | `GreeksCalculator`, `calculate_option_greeks`, `analyze_portfolio_risk` | Profiles and portfolio |
 | `get_btc_forward_price`, `get_option_data`, `get_available_instruments`, `get_btc_price` | Market data |
 | `get_btc_volatility` | **Not implemented** — raises `NotImplementedError` |
+| `close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`, `vol_premium` | Historical volatility analytics |
 
 Full signatures and defaults are in the source docstrings.
 
@@ -174,7 +193,7 @@ PYTHONPATH=. pytest tests/ -v
 python run_tests.py
 ```
 
-The suite includes **23** tests (pricing, Greeks, coin gamma, IV, vectorized parity, put–call parity, and data stubs). Install **pytest** if it is not already in the environment.
+The suite includes **29** tests (pricing, Greeks, coin gamma, IV, vectorized parity, historical vol estimators, and parity/data checks). Install **pytest** if it is not already in the environment.
 
 ## License and links
 

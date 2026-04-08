@@ -2,6 +2,13 @@ from .pricing import price_option, price_options_vectorized
 from .greeks import delta, gamma, vega, theta, rho
 from .utils import breakeven_price, breakeven_price_coin_based
 from .data_fetch import get_btc_forward_price, get_option_data, get_available_instruments, get_btc_price, get_btc_volatility
+from .historical_vol import (
+    close_to_close_hv,
+    parkinson_hv,
+    rogers_satchell_hv,
+    yang_zhang_hv,
+    vol_premium,
+)
 
 # Advanced implementations
 from .black_scholes import (
@@ -20,6 +27,8 @@ __all__ = [
     'breakeven_price_coin_based',
     'get_btc_forward_price', 'get_option_data', 'get_available_instruments',
     'get_btc_price', 'get_btc_volatility',
+    'close_to_close_hv', 'parkinson_hv', 'rogers_satchell_hv', 'yang_zhang_hv',
+    'vol_premium',
 
     # Advanced classes
     'BlackScholesModel', 'Black76Model', 'OptionParameters', 'OptionPricing',

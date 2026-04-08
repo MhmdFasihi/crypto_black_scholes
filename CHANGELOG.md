@@ -1,6 +1,31 @@
+
 # Changelog
 
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.3.0] — 2026-04-06
+
+### Added
+
+- New `crypto_bs.historical_vol` module with realized-vol estimators:
+  - `close_to_close_hv`
+  - `parkinson_hv`
+  - `rogers_satchell_hv`
+  - `yang_zhang_hv`
+  - `vol_premium`
+- Input validation for estimator window and positive OHLC inputs.
+- New test file `tests/test_historical_vol.py` covering estimator outputs and edge-case validation.
+
+### Changed
+
+- Package version bumped to `0.3.0`.
+- Public API exports now include historical-vol functions directly from `crypto_bs`.
+- README updated to document the new historical volatility functionality.
+
+### Notes
+
+- This release implements the historical-volatility part of the roadmap from the audit.
+- Vol-surface fitting remains planned for a subsequent release.
 
 ## [0.2.0] — 2026-04-05
 
@@ -32,5 +57,6 @@ All notable changes to **crypto_bs** are documented here. The format is based on
 
 - Initial public API: Black-76 and Black-Scholes with coin-settled adjustments, basic and portfolio Greeks, Deribit helpers, IV via Brent’s method, breakeven utilities.
 
+[0.3.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MhmdFasihi/crypto_black_scholes/releases/tag/v0.1.0
