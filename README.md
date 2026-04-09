@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 0.4.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, historical volatility estimators, and GEX/vol-regime analytics.
+**Version 0.5.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, and an implied-volatility surface foundation.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 
@@ -16,6 +16,7 @@ See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 - **Historical volatility** — Close-to-close, Parkinson, Rogers-Satchell, Yang-Zhang estimators
 - **GEX analytics** — Net gamma exposure by strike, cumulative GEX, gamma flip point
 - **Volatility regimes** — Term-structure and skew regime classifier with simple signal synthesis
+- **Volatility surface foundation** — Fit/interpolate IV over strike and maturity
 
 ## Model overview
 
@@ -181,6 +182,23 @@ va = VolatilityAnalytics(atm_term_structure=term, skew_by_maturity=skew)
 print(va.ts_regime(), va.skew_regime(), va.trading_signal())
 ```
 
+### Volatility surface
+
+```python
+import pandas as pd
+from crypto_bs import VolatilitySurface
+
+chain = pd.DataFrame({
+    "strike": [90000, 100000, 110000, 90000, 100000, 110000],
+    "time_to_maturity": [30/365, 30/365, 30/365, 90/365, 90/365, 90/365],
+    "implied_volatility": [0.74, 0.70, 0.73, 0.66, 0.62, 0.65],
+})
+surface = VolatilitySurface()
+surface.fit(chain)
+print(surface.get_iv(105000, 60/365))
+print(surface.get_term_structure())
+```
+
 ## API reference (summary)
 
 | Symbol | Role |
@@ -197,6 +215,7 @@ print(va.ts_regime(), va.skew_regime(), va.trading_signal())
 | `close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`, `vol_premium` | Historical volatility analytics |
 | `compute_gex`, `find_gamma_flip`, `gex_summary` | Gamma exposure analytics |
 | `VolatilityAnalytics` | Term structure/skew regimes and trading signal |
+| `VolatilitySurface` | IV surface fit/interpolation and sanity checks |
 
 Full signatures and defaults are in the source docstrings.
 
@@ -219,7 +238,7 @@ PYTHONPATH=. pytest tests/ -v
 python run_tests.py
 ```
 
-The suite includes **33** tests (pricing, Greeks, IV, historical vol, GEX, regime analytics, parity/data checks). Install **pytest** if it is not already in the environment.
+The suite includes **36** tests (pricing, Greeks, IV, historical vol, GEX, regime analytics, surface interpolation, and parity/data checks). Install **pytest** if it is not already in the environment.
 
 ## License and links
 
