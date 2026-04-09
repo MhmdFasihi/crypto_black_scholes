@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 0.3.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, and historical volatility estimators.
+**Version 0.4.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, historical volatility estimators, and GEX/vol-regime analytics.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 
@@ -14,6 +14,8 @@ See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 - **Vectorized chain pricing** — `price_options_vectorized` for many strikes / expiries at once
 - **Breakeven** — USD and coin-settled breakeven helpers
 - **Historical volatility** — Close-to-close, Parkinson, Rogers-Satchell, Yang-Zhang estimators
+- **GEX analytics** — Net gamma exposure by strike, cumulative GEX, gamma flip point
+- **Volatility regimes** — Term-structure and skew regime classifier with simple signal synthesis
 
 ## Model overview
 
@@ -157,6 +159,28 @@ hv_parkinson = parkinson_hv(high, low, window=5)
 hv_yz = yang_zhang_hv(open_, high, low, close, window=5)
 ```
 
+### GEX and volatility analytics
+
+```python
+import pandas as pd
+from crypto_bs import compute_gex, gex_summary, VolatilityAnalytics
+
+chain = pd.DataFrame({
+    "strike": [90000, 100000, 110000, 90000, 100000, 110000],
+    "time_to_maturity": [30/365] * 6,
+    "volatility": [0.7] * 6,
+    "option_type": ["call", "call", "call", "put", "put", "put"],
+    "open_interest": [1200, 1800, 900, 1400, 2000, 1300],
+})
+gex_df = compute_gex(chain, spot=100000)
+print(gex_summary(gex_df, spot=100000))
+
+term = pd.Series([0.85, 0.72, 0.65], index=[7/365, 30/365, 90/365])
+skew = pd.Series([0.04, 0.035, 0.03], index=[7/365, 30/365, 90/365])
+va = VolatilityAnalytics(atm_term_structure=term, skew_by_maturity=skew)
+print(va.ts_regime(), va.skew_regime(), va.trading_signal())
+```
+
 ## API reference (summary)
 
 | Symbol | Role |
@@ -171,6 +195,8 @@ hv_yz = yang_zhang_hv(open_, high, low, close, window=5)
 | `get_btc_forward_price`, `get_option_data`, `get_available_instruments`, `get_btc_price` | Market data |
 | `get_btc_volatility` | **Not implemented** — raises `NotImplementedError` |
 | `close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`, `vol_premium` | Historical volatility analytics |
+| `compute_gex`, `find_gamma_flip`, `gex_summary` | Gamma exposure analytics |
+| `VolatilityAnalytics` | Term structure/skew regimes and trading signal |
 
 Full signatures and defaults are in the source docstrings.
 
@@ -193,7 +219,7 @@ PYTHONPATH=. pytest tests/ -v
 python run_tests.py
 ```
 
-The suite includes **29** tests (pricing, Greeks, coin gamma, IV, vectorized parity, historical vol estimators, and parity/data checks). Install **pytest** if it is not already in the environment.
+The suite includes **33** tests (pricing, Greeks, IV, historical vol, GEX, regime analytics, parity/data checks). Install **pytest** if it is not already in the environment.
 
 ## License and links
 

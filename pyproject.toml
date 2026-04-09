@@ -1,17 +1,16 @@
 [project]
 name = "crypto_bs"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python library for pricing coin-settled crypto options"
 authors = [{name = "Seyed Mohammad Hossein Fasihi", email = "mhmd.fasihi@gmail.com"}]
 requires-python = ">=3.10"
 readme = {file = "README.md", content-type = "text/markdown"}
-license = {file = "LICENSE"}
+license = "MIT"
 keywords = [
     "black-scholes", "black-76", "options", "greeks", "implied-volatility",
     "crypto", "bitcoin", "deribit", "pricing", "risk"
 ]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

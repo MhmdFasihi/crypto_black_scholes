@@ -9,6 +9,8 @@ from .historical_vol import (
     yang_zhang_hv,
     vol_premium,
 )
+from .gex import compute_gex, find_gamma_flip, gex_summary
+from .analytics import VolatilityAnalytics
 
 # Advanced implementations
 from .black_scholes import (
@@ -29,6 +31,7 @@ __all__ = [
     'get_btc_price', 'get_btc_volatility',
     'close_to_close_hv', 'parkinson_hv', 'rogers_satchell_hv', 'yang_zhang_hv',
     'vol_premium',
+    'compute_gex', 'find_gamma_flip', 'gex_summary', 'VolatilityAnalytics',
 
     # Advanced classes
     'BlackScholesModel', 'Black76Model', 'OptionParameters', 'OptionPricing',
