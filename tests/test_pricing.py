@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 from scipy.stats import norm
 
+import crypto_bs.data_fetch as data_fetch
 from crypto_bs.pricing import price_option, price_options_vectorized
 from crypto_bs.greeks import delta, gamma, vega, theta, rho
 from crypto_bs.utils import breakeven_price
-from crypto_bs.data_fetch import get_btc_volatility
 
 # Import advanced classes
 from crypto_bs.black_scholes import BlackScholesModel, OptionParameters, OptionType, price_coin_based_option
@@ -95,9 +95,17 @@ def test_price_options_vectorized_matches_scalar():
         assert abs(vec[i] - price_option(F, K[i], T[i], sigma[i], types[i])) < 1e-12
 
 
-def test_get_btc_volatility_not_implemented():
-    with pytest.raises(NotImplementedError):
-        get_btc_volatility()
+def test_get_btc_volatility_delegates_to_default_client(monkeypatch):
+    class StubClient:
+        def get_btc_volatility(self, days=90, window=30, trading_days=365):
+            assert days == 90
+            assert window == 30
+            assert trading_days == 365
+            return 0.42
+
+    monkeypatch.setattr(data_fetch, "_get_default_client", lambda: StubClient())
+
+    assert data_fetch.get_btc_volatility() == 0.42
 
 
 # Advanced tests for coin-based options

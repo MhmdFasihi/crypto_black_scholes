@@ -3,5 +3,6 @@ include CHANGELOG.md
 include LICENSE
 include pyproject.toml
 recursive-include crypto_bs *.py
+recursive-include docs *.md
 recursive-include tests *.py
 recursive-include examples *.py

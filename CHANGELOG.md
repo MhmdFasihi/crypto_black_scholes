@@ -3,6 +3,29 @@
 
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-04-10
+
+### Added
+
+- New `crypto_bs.data_fetch.DeribitClient` with retry-enabled HTTP handling, short-lived response caching, and lightweight public-API pacing.
+- New top-level market-data helpers:
+  - `get_full_chain(currency="BTC", min_open_interest=0)`
+  - `get_iv_surface_data(currency="BTC", min_open_interest=0)`
+- New test file `tests/test_data_fetch.py` covering ticker normalization, full-chain construction, surface-input filtering, and realized-volatility behavior.
+- New local documentation tree under `docs/` with guides, cookbook recipes, and grouped API reference pages.
+
+### Changed
+
+- `get_btc_volatility()` now computes realized BTC volatility from CoinGecko daily closes using the existing `close_to_close_hv` estimator instead of raising `NotImplementedError`.
+- Existing market-data wrappers now delegate through a shared client implementation for consistent timeout, retry, and caching behavior.
+- Public API exports now include `DeribitClient`, `get_full_chain`, and `get_iv_surface_data`.
+- Package version bumped to `0.6.0`.
+
+### Documentation
+
+- README updated for the new market-data client, docs index, and realized-volatility workflow.
+- `docs/README.md` now resolves to actual guide and reference pages instead of placeholder links.
+
 ## [0.5.0] — 2026-04-09
 
 ### Added
@@ -98,6 +121,7 @@ All notable changes to **crypto_bs** are documented here. The format is based on
 
 - Initial public API: Black-76 and Black-Scholes with coin-settled adjustments, basic and portfolio Greeks, Deribit helpers, IV via Brent’s method, breakeven utilities.
 
+[0.6.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.2.0...v0.3.0

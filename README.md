@@ -1,15 +1,16 @@
 # Crypto Black-Scholes
 
-**Version 0.5.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, and an implied-volatility surface foundation.
+**Version 0.6.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, an implied-volatility surface foundation, and a reusable market-data client.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
+See **[docs/README.md](docs/README.md)** for the local documentation index.
 
 ## Features
 
 - **Pricing** — Black-76 (forward / coin premium), enhanced Black-Scholes with USD vs coin-denominated premium
 - **Greeks** — Delta (USD vs coin premium), gamma, theta, vega, rho; second-order Greeks (speed, charm, vanna, vomma) via finite differences in `GreeksCalculator`
 - **Portfolio** — Multi-position Greeks, risk metrics, gamma exposure profile
-- **Data** — Deribit REST helpers (timeouts on HTTP calls)
+- **Data** — Deribit REST helpers, reusable `DeribitClient`, normalized chain/surface fetchers, CoinGecko-backed BTC spot and realized-vol helpers
 - **IV** — Implied vol from market price (Brent’s method), intrinsic and bounds checks
 - **Vectorized chain pricing** — `price_options_vectorized` for many strikes / expiries at once
 - **Breakeven** — USD and coin-settled breakeven helpers
@@ -38,11 +39,19 @@ import crypto_bs
 
 Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests` (see `pyproject.toml`).
 
+## Documentation
+
+- [Docs index](docs/README.md)
+- [Getting started](docs/guides/getting-started.md)
+- [Data and market inputs](docs/guides/data-and-market-inputs.md)
+- [Volatility surface guide](docs/guides/volatility-surface.md)
+- [Cookbook](docs/tutorials/cookbook.md)
+
 ## Upgrading from 0.1.x
 
 - Replace **`result.delta`** with **`result.delta_usd`** (hedging / notional delta) and/or **`result.delta_coin`** (academic / premium-in-coin sensitivity).
 - Dicts from **`price_coin_based_option`** / **`validate_deribit_pricing`**: use **`delta_usd`** / **`delta_coin`** instead of **`delta`**.
-- **`get_btc_volatility()`** remains unimplemented in `data_fetch`; use `crypto_bs.historical_vol` functions for realized volatility from OHLC data.
+- **`get_btc_volatility()`** now computes realized volatility from CoinGecko daily closes; for exchange-specific studies, prefer feeding your own OHLC data into `crypto_bs.historical_vol`.
 - Optional: add **`pytest`** to your environment for the test suite (`pip install pytest`).
 
 ## Quick start
@@ -122,13 +131,21 @@ print("Portfolio delta (USD):", risk["portfolio_summary"]["total_delta"])
 print("Gamma exposure:", risk["risk_metrics"]["gamma_exposure"])
 ```
 
-### Deribit helpers
+### Market data helpers
 
 ```python
-from crypto_bs import get_btc_forward_price, get_option_data, validate_deribit_pricing
+from crypto_bs import (
+    DeribitClient,
+    get_btc_forward_price,
+    get_option_data,
+    validate_deribit_pricing,
+)
 
 F = get_btc_forward_price()
 option_data = get_option_data("BTC-3SEP25-105000-C")
+client = DeribitClient()
+chain = client.get_full_chain(min_open_interest=100)
+surface_input = client.get_iv_surface_data(min_open_interest=100)
 
 validation = validate_deribit_pricing(
     deribit_price_btc=option_data["mark_price"],
@@ -139,15 +156,17 @@ validation = validate_deribit_pricing(
 )
 print("IV:", validation["implied_volatility"])
 print("Delta USD:", validation["delta_usd"])
+print("Chain rows:", len(chain))
+print("Surface rows:", len(surface_input))
 ```
 
-Requests use a **10-second timeout**; failures surface as `requests` exceptions or `ValueError` from the API helpers.
+Requests use a **10-second timeout**; the client adds retries, short-lived caching, and lightweight pacing for repeated Deribit calls. Failures surface as `requests` exceptions or `ValueError` from the helpers.
 
 ### Historical volatility
 
 ```python
 import pandas as pd
-from crypto_bs import close_to_close_hv, parkinson_hv, yang_zhang_hv
+from crypto_bs import close_to_close_hv, get_btc_volatility, parkinson_hv, yang_zhang_hv
 
 # Example OHLC arrays as pandas Series
 close = pd.Series([100, 102, 101, 104, 103, 106, 108])
@@ -158,6 +177,7 @@ open_ = close.shift(1).fillna(close.iloc[0])
 hv_cc = close_to_close_hv(close, window=5)
 hv_parkinson = parkinson_hv(high, low, window=5)
 hv_yz = yang_zhang_hv(open_, high, low, close, window=5)
+btc_hv = get_btc_volatility(days=120, window=30)
 ```
 
 ### GEX and volatility analytics
@@ -210,8 +230,10 @@ print(surface.get_term_structure())
 | `BlackScholesModel`, `OptionParameters`, `OptionPricing` | Full pricing + Greeks; **`OptionPricing.delta_usd` / `delta_coin`** |
 | `calculate_implied_volatility` | IV search; default max vol **20.0**; validates vs intrinsic |
 | `GreeksCalculator`, `calculate_option_greeks`, `analyze_portfolio_risk` | Profiles and portfolio |
-| `get_btc_forward_price`, `get_option_data`, `get_available_instruments`, `get_btc_price` | Market data |
-| `get_btc_volatility` | **Not implemented** — raises `NotImplementedError` |
+| `DeribitClient` | Reusable market-data client with retry/cache/pacing |
+| `get_btc_forward_price`, `get_option_data`, `get_available_instruments`, `get_btc_price` | Market-data convenience wrappers |
+| `get_full_chain`, `get_iv_surface_data` | Normalized chain and surface-input fetchers |
+| `get_btc_volatility` | Realized volatility from CoinGecko daily closes |
 | `close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`, `vol_premium` | Historical volatility analytics |
 | `compute_gex`, `find_gamma_flip`, `gex_summary` | Gamma exposure analytics |
 | `VolatilityAnalytics` | Term structure/skew regimes and trading signal |
