@@ -23,6 +23,12 @@ This page groups the public API by workflow rather than mirroring the package fi
 - `GreeksCalculator`
 - `calculate_option_greeks`
 - `analyze_portfolio_risk`
+- `PortfolioPosition`
+- `PortfolioAnalyzer`
+- `PortfolioDistribution`
+- `PortfolioReport`
+- `stress_test_portfolio`
+- `build_portfolio_report`
 
 ## Market data
 

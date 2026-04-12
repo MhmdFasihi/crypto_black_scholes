@@ -29,6 +29,8 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      HAS_TEST_PYPI_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN != '' }}
     permissions:
       id-token: write  # for trusted publishing (if enabled)
     steps:
@@ -41,10 +43,15 @@ jobs:
           python -m pip install --upgrade build
           python -m build
       - name: Publish to TestPyPI
+        if: env.HAS_TEST_PYPI_TOKEN == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+      - name: Skip TestPyPI publish
+        if: env.HAS_TEST_PYPI_TOKEN != 'true'
+        run: echo "TEST_PYPI_API_TOKEN is not configured; skipping TestPyPI publish."
 
   publish-pypi:
     name: Publish to PyPI (on release)
@@ -66,4 +73,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-
+          skip-existing: true

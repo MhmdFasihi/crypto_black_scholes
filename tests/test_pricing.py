@@ -3,6 +3,7 @@ import pytest
 from scipy.stats import norm
 
 import crypto_bs.data_fetch as data_fetch
+import crypto_bs
 from crypto_bs.pricing import price_option, price_options_vectorized
 from crypto_bs.greeks import delta, gamma, vega, theta, rho
 from crypto_bs.utils import breakeven_price
@@ -106,6 +107,12 @@ def test_get_btc_volatility_delegates_to_default_client(monkeypatch):
     monkeypatch.setattr(data_fetch, "_get_default_client", lambda: StubClient())
 
     assert data_fetch.get_btc_volatility() == 0.42
+
+
+def test_public_api_version_and_exports():
+    assert crypto_bs.__version__ == "0.7.0"
+    assert hasattr(crypto_bs, "DeribitClient")
+    assert hasattr(crypto_bs, "PortfolioAnalyzer")
 
 
 # Advanced tests for coin-based options

@@ -20,6 +20,14 @@ from .historical_vol import (
 )
 from .gex import compute_gex, find_gamma_flip, gex_summary
 from .analytics import VolatilityAnalytics
+from .portfolio import (
+    PortfolioAnalyzer,
+    PortfolioDistribution,
+    PortfolioPosition,
+    PortfolioReport,
+    build_portfolio_report,
+    stress_test_portfolio,
+)
 from .surface import VolatilitySurface
 
 # Advanced implementations
@@ -48,12 +56,14 @@ __all__ = [
     # Advanced classes
     'BlackScholesModel', 'Black76Model', 'OptionParameters', 'OptionPricing',
     'OptionType', 'PricingModel', 'GreeksCalculator', 'GreeksProfile',
-    'PortfolioGreeks', 'RiskMetrics',
+    'PortfolioGreeks', 'RiskMetrics', 'PortfolioAnalyzer', 'PortfolioPosition',
+    'PortfolioDistribution', 'PortfolioReport',
 
     # Advanced functions
     'price_coin_based_option', 'validate_deribit_pricing',
-    'calculate_option_greeks', 'analyze_portfolio_risk'
+    'calculate_option_greeks', 'analyze_portfolio_risk',
+    'build_portfolio_report', 'stress_test_portfolio',
 ]
 
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

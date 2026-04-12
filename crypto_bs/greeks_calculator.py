@@ -10,7 +10,7 @@ Supports coin-based options and portfolio risk metrics
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass, field
 from enum import Enum
 import logging
@@ -341,6 +341,8 @@ class GreeksCalculator:
                 strike_price=strike,
                 time_to_maturity=position['time_to_maturity'],
                 volatility=position['volatility'],
+                risk_free_rate=position.get('risk_free_rate', 0.05),
+                dividend_yield=position.get('dividend_yield', 0.0),
                 option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                 is_coin_based=position.get('is_coin_based', False)
             )
@@ -357,6 +359,8 @@ class GreeksCalculator:
                     strike_price=p['strike_price'],
                     time_to_maturity=p['time_to_maturity'],
                     volatility=p['volatility'],
+                    risk_free_rate=p.get('risk_free_rate', 0.05),
+                    dividend_yield=p.get('dividend_yield', 0.0),
                     option_type=OptionType.CALL if p['option_type'].lower() == 'call' else OptionType.PUT,
                     is_coin_based=p.get('is_coin_based', False)
                 )
@@ -379,6 +383,8 @@ class GreeksCalculator:
                         strike_price=position['strike_price'],
                         time_to_maturity=position['time_to_maturity'],
                         volatility=position['volatility'],
+                        risk_free_rate=position.get('risk_free_rate', 0.05),
+                        dividend_yield=position.get('dividend_yield', 0.0),
                         option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                         is_coin_based=position.get('is_coin_based', False)
                     )
@@ -431,6 +437,8 @@ class GreeksCalculator:
                     strike_price=position['strike_price'],
                     time_to_maturity=position['time_to_maturity'],
                     volatility=position['volatility'],
+                    risk_free_rate=position.get('risk_free_rate', 0.05),
+                    dividend_yield=position.get('dividend_yield', 0.0),
                     option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                     is_coin_based=position.get('is_coin_based', False)
                 )
@@ -472,7 +480,7 @@ def calculate_option_greeks(spot: float, strike: float, time_to_maturity: float,
     return greeks.to_dict()
 
 
-def analyze_portfolio_risk(positions: List[Dict]) -> Dict[str, any]:
+def analyze_portfolio_risk(positions: List[Dict]) -> Dict[str, Any]:
     """
     Analyze portfolio risk metrics.
     

@@ -10,7 +10,7 @@ The package keeps simple module-level helpers:
 - `get_btc_price()`
 - `get_btc_volatility(days=90, window=30, trading_days=365)`
 
-These now delegate to a shared client implementation in `0.6.0`.
+These now delegate to a shared client implementation introduced in `0.6.0`.
 
 ## `DeribitClient`
 

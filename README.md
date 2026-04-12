@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 0.6.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, an implied-volatility surface foundation, and a reusable market-data client.
+**Version 0.7.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, first-class portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, an implied-volatility surface foundation, and a reusable market-data client.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 See **[docs/README.md](docs/README.md)** for the local documentation index.
@@ -10,6 +10,7 @@ See **[docs/README.md](docs/README.md)** for the local documentation index.
 - **Pricing** — Black-76 (forward / coin premium), enhanced Black-Scholes with USD vs coin-denominated premium
 - **Greeks** — Delta (USD vs coin premium), gamma, theta, vega, rho; second-order Greeks (speed, charm, vanna, vomma) via finite differences in `GreeksCalculator`
 - **Portfolio** — Multi-position Greeks, risk metrics, gamma exposure profile
+- **Portfolio reports** — Position breakdowns, concentration metrics, stress tests, and scenario-based VaR/CVaR
 - **Data** — Deribit REST helpers, reusable `DeribitClient`, normalized chain/surface fetchers, CoinGecko-backed BTC spot and realized-vol helpers
 - **IV** — Implied vol from market price (Brent’s method), intrinsic and bounds checks
 - **Vectorized chain pricing** — `price_options_vectorized` for many strikes / expiries at once
@@ -44,6 +45,7 @@ Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests` (see `pyproject.
 - [Docs index](docs/README.md)
 - [Getting started](docs/guides/getting-started.md)
 - [Data and market inputs](docs/guides/data-and-market-inputs.md)
+- [Portfolio risk guide](docs/guides/portfolio-risk-report.md)
 - [Volatility surface guide](docs/guides/volatility-surface.md)
 - [Cookbook](docs/tutorials/cookbook.md)
 
@@ -111,7 +113,7 @@ print(f"Delta coin premium: {result.delta_coin:.9f}")
 ### Portfolio risk
 
 ```python
-from crypto_bs import analyze_portfolio_risk
+from crypto_bs import PortfolioAnalyzer, analyze_portfolio_risk
 
 portfolio = [
     {
@@ -127,8 +129,10 @@ portfolio = [
 ]
 
 risk = analyze_portfolio_risk(portfolio)
+report = PortfolioAnalyzer().build_report(portfolio)
 print("Portfolio delta (USD):", risk["portfolio_summary"]["total_delta"])
 print("Gamma exposure:", risk["risk_metrics"]["gamma_exposure"])
+print("One-day VaR:", report.risk_distribution.value_at_risk)
 ```
 
 ### Market data helpers
@@ -229,7 +233,9 @@ print(surface.get_term_structure())
 | `breakeven_price`, `breakeven_price_coin_based` | Breakeven spot levels |
 | `BlackScholesModel`, `OptionParameters`, `OptionPricing` | Full pricing + Greeks; **`OptionPricing.delta_usd` / `delta_coin`** |
 | `calculate_implied_volatility` | IV search; default max vol **20.0**; validates vs intrinsic |
-| `GreeksCalculator`, `calculate_option_greeks`, `analyze_portfolio_risk` | Profiles and portfolio |
+| `GreeksCalculator`, `calculate_option_greeks`, `analyze_portfolio_risk` | Profiles and portfolio Greeks |
+| `PortfolioAnalyzer`, `PortfolioPosition`, `PortfolioDistribution`, `PortfolioReport` | Portfolio report, stress, and VaR/CVaR layer |
+| `build_portfolio_report`, `stress_test_portfolio` | Portfolio-report convenience wrappers |
 | `DeribitClient` | Reusable market-data client with retry/cache/pacing |
 | `get_btc_forward_price`, `get_option_data`, `get_available_instruments`, `get_btc_price` | Market-data convenience wrappers |
 | `get_full_chain`, `get_iv_surface_data` | Normalized chain and surface-input fetchers |
@@ -260,7 +266,7 @@ PYTHONPATH=. pytest tests/ -v
 python run_tests.py
 ```
 
-The suite includes **36** tests (pricing, Greeks, IV, historical vol, GEX, regime analytics, surface interpolation, and parity/data checks). Install **pytest** if it is not already in the environment.
+The suite includes **45** tests (pricing, Greeks, IV, historical vol, GEX, surface/data checks, and portfolio reporting). Install **pytest** if it is not already in the environment.
 
 ## License and links
 

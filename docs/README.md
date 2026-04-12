@@ -1,6 +1,6 @@
 # crypto_bs Documentation
 
-This directory contains the local documentation set for `crypto_bs`, organized as a practical developer guide for release `0.6.0`.
+This directory contains the local documentation set for `crypto_bs`, organized as a practical developer guide for release `0.7.0`.
 
 ## Contents
 
@@ -8,6 +8,7 @@ This directory contains the local documentation set for `crypto_bs`, organized a
 - [Core Concepts](guides/core-concepts.md)
 - [Pricing Guide](guides/pricing-guide.md)
 - [Risk and Greeks Guide](guides/risk-and-greeks.md)
+- [Portfolio Risk Guide](guides/portfolio-risk-report.md)
 - [Data and Market Inputs](guides/data-and-market-inputs.md)
 - [Volatility Analytics](guides/volatility-analytics.md)
 - [Volatility Surface Guide](guides/volatility-surface.md)
@@ -18,12 +19,12 @@ This directory contains the local documentation set for `crypto_bs`, organized a
 ## Who should read what?
 
 - New users: start at **Getting Started** and **Pricing Guide**.
-- Traders/analysts: jump to **Risk and Greeks**, **Volatility Analytics**, and **GEX Guide**.
+- Traders/analysts: jump to **Risk and Greeks**, **Portfolio Risk Guide**, **Volatility Analytics**, and **GEX Guide**.
 - Integrators: read **Data and Market Inputs** and **API Reference**.
 
 ## Version
 
-This documentation targets **v0.6.0**.
+This documentation targets **v0.7.0**.
 
 ## Notes
 

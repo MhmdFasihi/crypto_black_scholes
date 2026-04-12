@@ -3,6 +3,36 @@
 
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-04-10
+
+### Added
+
+- New `crypto_bs.portfolio` module with:
+  - `PortfolioPosition`
+  - `PortfolioAnalyzer`
+  - `PortfolioDistribution`
+  - `PortfolioReport`
+  - `stress_test_portfolio(...)`
+  - `build_portfolio_report(...)`
+- New portfolio analytics capabilities:
+  - position-level breakdowns
+  - concentration summaries by underlying and expiry bucket
+  - full-repricing stress tests over spot, volatility, and forward time
+  - scenario-based VaR / CVaR estimation using portfolio Greeks
+- New tests in `tests/test_portfolio.py` covering report shape, stress behavior, and tail-risk outputs.
+
+### Changed
+
+- Existing portfolio risk calculations now carry `risk_free_rate` and `dividend_yield` through internal repricing paths more consistently.
+- GitHub publish workflow now skips TestPyPI publication when `TEST_PYPI_API_TOKEN` is absent instead of failing the whole `main` push workflow.
+- PyPI/TestPyPI publish steps now use `skip-existing: true` so release reruns are idempotent.
+- Package version bumped to `0.7.0`.
+
+### Documentation
+
+- README updated with portfolio report examples and API summary for the new module.
+- Docs now include a dedicated portfolio risk guide and target `v0.7.0`.
+
 ## [0.6.0] — 2026-04-10
 
 ### Added
@@ -121,6 +151,7 @@ All notable changes to **crypto_bs** are documented here. The format is based on
 
 - Initial public API: Black-76 and Black-Scholes with coin-settled adjustments, basic and portfolio Greeks, Deribit helpers, IV via Brent’s method, breakeven utilities.
 
+[0.7.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.3.0...v0.4.0
