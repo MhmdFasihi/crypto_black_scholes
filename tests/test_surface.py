@@ -52,11 +52,17 @@ def test_surface_smile_slice_and_metrics():
     s = VolatilitySurface()
     s.fit(_chain())
     smile = s.get_smile_slice(30 / 365, num_points=9)
+    grid = s.get_surface_grid(maturities=[7 / 365, 30 / 365], num_strikes=5)
+    summary = s.describe_surface()
     skew = s.get_skew(30 / 365)
     rr = s.get_risk_reversal(30 / 365)
     bf = s.get_butterfly(30 / 365)
     checks = s.check_arbitrage()
     assert len(smile) == 9
+    assert len(grid) == 10
+    assert {"time_to_maturity", "strike", "implied_volatility", "moneyness", "log_moneyness"} <= set(grid.columns)
+    assert len(summary) == 3
+    assert {"atm_iv", "skew", "risk_reversal", "butterfly", "quote_count"} <= set(summary.columns)
     assert {"strike", "implied_volatility", "moneyness", "log_moneyness"} <= set(smile.columns)
     assert isinstance(skew, float)
     assert skew > 0
@@ -81,3 +87,13 @@ def test_volatility_analytics_from_surface():
     analytics = VolatilityAnalytics.from_surface(s)
     assert analytics.ts_regime() == "BACKWARDATION"
     assert analytics.skew_regime() == "STEEP"
+
+
+def test_surface_describe_surface_handles_requested_interpolated_maturity():
+    s = VolatilitySurface()
+    s.fit(_chain())
+    summary = s.describe_surface(maturities=[14 / 365], delta=0.25)
+    row = summary.iloc[0]
+    assert row["time_to_maturity"] == 14 / 365
+    assert row["nearest_fitted_maturity"] == 7 / 365
+    assert row["atm_iv"] > 0

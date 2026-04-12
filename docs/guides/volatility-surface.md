@@ -2,7 +2,7 @@
 
 ## Fit a surface
 
-`VolatilitySurface` now provides a lightweight interpolation layer over strike and maturity plus smile-oriented wing metrics:
+`VolatilitySurface` now provides a lightweight interpolation layer over strike and maturity plus smile-oriented wing metrics, along with export-ready grid and summary helpers:
 
 ```python
 import pandas as pd
@@ -29,6 +29,8 @@ iv = surface.get_iv(105000, 60 / 365)
 atm = surface.get_atm_iv(30 / 365)
 term = surface.get_term_structure()
 smile = surface.get_smile_slice(30 / 365, num_points=7)
+grid = surface.get_surface_grid(maturities=[30 / 365, 60 / 365], num_strikes=5)
+summary = surface.describe_surface()
 skew = surface.get_skew(30 / 365)
 rr = surface.get_risk_reversal(30 / 365)
 bf = surface.get_butterfly(30 / 365)
@@ -53,6 +55,8 @@ This release keeps the surface intentionally simple:
 
 - interpolation by strike within fitted maturities
 - linear interpolation across maturities
+- export of long-form surface grids for charting or downstream analysis
+- report-ready maturity summaries from `describe_surface()`
 - delta-aware wing metrics when `underlying_price` and `option_type` are available
 - basic smile and calendar consistency checks
 

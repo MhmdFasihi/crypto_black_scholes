@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 0.8.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, first-class portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, and a richer implied-volatility surface and smile-analytics layer.
+**Version 0.9.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, first-class portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, and a richer implied-volatility surface and smile-analytics layer with export-ready diagnostics.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 See **[docs/README.md](docs/README.md)** for the local documentation index.
@@ -17,8 +17,8 @@ See **[docs/README.md](docs/README.md)** for the local documentation index.
 - **Breakeven** — USD and coin-settled breakeven helpers
 - **Historical volatility** — Close-to-close, Parkinson, Rogers-Satchell, Yang-Zhang estimators
 - **GEX analytics** — Net gamma exposure by strike, cumulative GEX, gamma flip point
-- **Volatility regimes** — Term-structure and skew regime classifier with simple signal synthesis
-- **Volatility surface analytics** — Fit/interpolate IV over strike and maturity, extract smile slices, and compute skew/risk-reversal/butterfly metrics
+- **Volatility regimes** — Term-structure and skew regime classifier with report-ready metrics and simple signal synthesis
+- **Volatility surface analytics** — Fit/interpolate IV over strike and maturity, extract smile slices, export dense surface grids, and compute skew/risk-reversal/butterfly metrics
 
 ## Model overview
 
@@ -203,7 +203,8 @@ print(gex_summary(gex_df, spot=100000))
 term = pd.Series([0.85, 0.72, 0.65], index=[7/365, 30/365, 90/365])
 skew = pd.Series([0.04, 0.035, 0.03], index=[7/365, 30/365, 90/365])
 va = VolatilityAnalytics(atm_term_structure=term, skew_by_maturity=skew)
-print(va.ts_regime(), va.skew_regime(), va.trading_signal())
+print(va.term_structure_metrics())
+print(va.summary(hv_30d=0.55))
 ```
 
 ### Volatility surface
@@ -224,10 +225,12 @@ surface.fit(chain)
 print(surface.get_iv(105000, 60/365))
 print(surface.get_term_structure())
 print(surface.get_smile_slice(30/365, num_points=5))
+print(surface.get_surface_grid(maturities=[30/365, 60/365], num_strikes=5).head())
+print(surface.describe_surface())
 print(surface.get_risk_reversal(30/365), surface.get_butterfly(30/365))
 
 analytics = VolatilityAnalytics.from_surface(surface)
-print(analytics.ts_regime(), analytics.skew_regime())
+print(analytics.summary())
 ```
 
 ## API reference (summary)
@@ -249,8 +252,8 @@ print(analytics.ts_regime(), analytics.skew_regime())
 | `get_btc_volatility` | Realized volatility from CoinGecko daily closes |
 | `close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`, `vol_premium` | Historical volatility analytics |
 | `compute_gex`, `find_gamma_flip`, `gex_summary` | Gamma exposure analytics |
-| `VolatilityAnalytics` | Term structure/skew regimes and trading signal |
-| `VolatilitySurface` | IV surface fit/interpolation, smile slices, RR/BF metrics, and sanity checks |
+| `VolatilityAnalytics` | Term-structure/skew metrics, regimes, and summary signal snapshot |
+| `VolatilitySurface` | IV surface fit/interpolation, smile slices, plot-ready grids, maturity summaries, and sanity checks |
 
 Full signatures and defaults are in the source docstrings.
 
@@ -273,7 +276,7 @@ PYTHONPATH=. pytest tests/ -v
 python run_tests.py
 ```
 
-The suite includes **47** tests (pricing, Greeks, IV, historical vol, GEX, surface/data checks, and portfolio reporting). Install **pytest** if it is not already in the environment.
+The suite includes **50** tests (pricing, Greeks, IV, historical vol, GEX, surface/data checks, analytics summaries, and portfolio reporting). Install **pytest** if it is not already in the environment.
 
 ## License and links
 

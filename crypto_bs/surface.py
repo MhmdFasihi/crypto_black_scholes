@@ -181,6 +181,106 @@ class VolatilitySurface:
             smile["log_moneyness"] = np.log(smile["strike"] / spot)
         return smile
 
+    def get_surface_grid(
+        self,
+        maturities: np.ndarray | list[float] | None = None,
+        strike_grid: np.ndarray | list[float] | None = None,
+        num_strikes: int = 21,
+    ) -> pd.DataFrame:
+        """
+        Return a plot-ready long-form surface grid.
+
+        The returned DataFrame contains one row per strike / maturity pair with
+        interpolated implied volatility plus moneyness diagnostics when a
+        reference spot is available.
+        """
+        self._require_fitted()
+        if maturities is None:
+            maturity_grid = np.array(sorted(self._by_t.keys()), dtype=float)
+        else:
+            maturity_grid = np.asarray(maturities, dtype=float)
+            if maturity_grid.size == 0:
+                raise ValueError("maturities cannot be empty")
+            maturity_grid = np.unique(maturity_grid.astype(float))
+
+        if strike_grid is None:
+            if num_strikes <= 0:
+                raise ValueError("num_strikes must be positive")
+            all_strikes = np.concatenate(
+                [frame["strike"].to_numpy(dtype=float) for frame in self._by_t.values()]
+            )
+            if all_strikes.size == 1:
+                strike_values = np.array([float(all_strikes[0])], dtype=float)
+            else:
+                strike_values = np.linspace(
+                    float(all_strikes.min()),
+                    float(all_strikes.max()),
+                    num_strikes,
+                )
+        else:
+            strike_values = np.asarray(strike_grid, dtype=float)
+            if strike_values.size == 0:
+                raise ValueError("strike_grid cannot be empty")
+
+        frames: list[pd.DataFrame] = []
+        for maturity in maturity_grid:
+            slice_df = self.get_smile_slice(
+                float(maturity),
+                num_points=len(strike_values),
+                strike_grid=strike_values,
+            ).copy()
+            slice_df.insert(0, "time_to_maturity", float(maturity))
+            frames.append(slice_df)
+        return pd.concat(frames, ignore_index=True)
+
+    def describe_surface(
+        self,
+        maturities: np.ndarray | list[float] | None = None,
+        delta: float = 0.25,
+    ) -> pd.DataFrame:
+        """
+        Summarize the fitted surface by maturity.
+
+        Each row combines ATM IV, wing metrics, strike coverage, and metadata
+        about the nearest fitted maturity used for smile-wing extraction.
+        """
+        self._require_fitted()
+        if maturities is None:
+            maturity_grid = np.array(sorted(self._by_t.keys()), dtype=float)
+        else:
+            maturity_grid = np.asarray(maturities, dtype=float)
+            if maturity_grid.size == 0:
+                raise ValueError("maturities cannot be empty")
+            maturity_grid = np.unique(maturity_grid.astype(float))
+
+        rows: list[dict[str, float | int]] = []
+        for maturity in maturity_grid:
+            requested_t = float(maturity)
+            nearest_t = self._nearest_time(requested_t)
+            nearest_slice = self._by_t[nearest_t]
+            nearest_raw = self._raw_by_t[nearest_t]
+            spot = self._reference_spot(requested_t)
+            metrics = self.get_smile_metrics(requested_t, delta=delta)
+            rows.append(
+                {
+                    "time_to_maturity": requested_t,
+                    "nearest_fitted_maturity": nearest_t,
+                    "reference_spot": np.nan if spot is None else float(spot),
+                    "atm_iv": float(self.get_atm_iv(requested_t)),
+                    "put_iv": float(metrics["put_iv"]),
+                    "call_iv": float(metrics["call_iv"]),
+                    "put_strike": float(metrics["put_strike"]),
+                    "call_strike": float(metrics["call_strike"]),
+                    "skew": float(metrics["skew"]),
+                    "risk_reversal": float(metrics["risk_reversal"]),
+                    "butterfly": float(metrics["butterfly"]),
+                    "strike_min": float(nearest_slice["strike"].min()),
+                    "strike_max": float(nearest_slice["strike"].max()),
+                    "quote_count": int(len(nearest_raw)),
+                }
+            )
+        return pd.DataFrame(rows).sort_values("time_to_maturity").reset_index(drop=True)
+
     def _delta_metrics(self, time_to_maturity: float, delta: float) -> dict[str, float] | None:
         if not 0 < delta < 0.5:
             raise ValueError("delta must be between 0 and 0.5")

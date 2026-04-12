@@ -29,6 +29,8 @@ surface_input = client.get_iv_surface_data(min_open_interest=100)
 surface = VolatilitySurface()
 surface.fit(surface_input[["strike", "time_to_maturity", "implied_volatility"]])
 print(surface.get_term_structure())
+print(surface.get_surface_grid(num_strikes=7).head())
+print(surface.describe_surface().head())
 ```
 
 ## Recipe: Compare implied vol to realized vol
@@ -47,5 +49,5 @@ term = (
 analytics = VolatilityAnalytics(atm_term_structure=term)
 
 rv = client.get_btc_volatility(days=120, window=30)
-print(analytics.vol_premium(rv))
+print(analytics.summary(hv_30d=rv))
 ```

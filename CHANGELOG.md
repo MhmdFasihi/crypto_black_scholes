@@ -3,6 +3,20 @@
 
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-04-12
+
+### Added
+
+- `VolatilitySurface.get_surface_grid(...)` for exporting a dense, plot-ready IV surface across strike and maturity.
+- `VolatilitySurface.describe_surface(...)` for report-ready maturity summaries including ATM IV, skew, risk reversal, butterfly, strike coverage, and quote counts.
+- `VolatilityAnalytics.term_structure_metrics(...)`, `skew_term_metrics(...)`, and `summary(...)` for explicit diagnostics beyond simple regime labels.
+- New tests covering surface-grid extraction, interpolated surface descriptions, and analytics summary output.
+
+### Changed
+
+- README and docs now show how to export long-form surface grids and generate one-call analytics summaries from a fitted surface.
+- Package version bumped to `0.9.0`.
+
 ## [0.8.0] — 2026-04-12
 
 ### Added
@@ -174,6 +188,7 @@ All notable changes to **crypto_bs** are documented here. The format is based on
 
 - Initial public API: Black-76 and Black-Scholes with coin-settled adjustments, basic and portfolio Greeks, Deribit helpers, IV via Brent’s method, breakeven utilities.
 
+[0.9.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.5.0...v0.6.0

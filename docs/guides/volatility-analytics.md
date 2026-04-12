@@ -36,9 +36,9 @@ term = pd.Series([0.85, 0.72, 0.65], index=[7 / 365, 30 / 365, 90 / 365])
 skew = pd.Series([0.04, 0.035, 0.03], index=[7 / 365, 30 / 365, 90 / 365])
 
 va = VolatilityAnalytics(atm_term_structure=term, skew_by_maturity=skew)
-print(va.ts_regime())
-print(va.skew_regime())
-print(va.trading_signal())
+print(va.term_structure_metrics())
+print(va.skew_term_metrics())
+print(va.summary(hv_30d=0.55))
 ```
 
 You can also build analytics directly from a fitted surface:
@@ -49,7 +49,7 @@ from crypto_bs import VolatilityAnalytics, VolatilitySurface
 surface = VolatilitySurface()
 surface.fit(chain_df)
 va = VolatilityAnalytics.from_surface(surface)
-print(va.ts_regime(), va.skew_regime())
+print(va.summary())
 ```
 
 ## IV vs RV

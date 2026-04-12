@@ -70,6 +70,97 @@ class VolatilityAnalytics:
         nearest = int(np.abs(idx - target_t).argmin())
         return float(vals[nearest])
 
+    def _nearest_skew(self, target_t: float) -> float:
+        if self.skew_by_maturity is None or self.skew_by_maturity.empty:
+            raise ValueError("skew_by_maturity is required for skew_term_metrics()")
+        idx = np.asarray(self.skew_by_maturity.index, dtype=float)
+        vals = np.asarray(self.skew_by_maturity.values, dtype=float)
+        nearest = int(np.abs(idx - target_t).argmin())
+        return float(vals[nearest])
+
+    def term_structure_metrics(
+        self,
+        front_target: float = 7.0 / 365.0,
+        anchor_target: float = 30.0 / 365.0,
+        back_target: float = 90.0 / 365.0,
+    ) -> Dict[str, float]:
+        """
+        Return explicit term-structure diagnostics.
+
+        The output is designed for dashboards and release notes, not just regime
+        classification.
+        """
+        for label, value in (
+            ("front_target", front_target),
+            ("anchor_target", anchor_target),
+            ("back_target", back_target),
+        ):
+            if value <= 0:
+                raise ValueError(f"{label} must be positive")
+
+        iv_front = self._nearest_iv(front_target)
+        iv_anchor = self._nearest_iv(anchor_target)
+        iv_back = self._nearest_iv(back_target)
+
+        x = np.asarray(self.atm_term_structure.index, dtype=float)
+        y = np.asarray(self.atm_term_structure.values, dtype=float)
+        slope_per_year = 0.0
+        slope_per_log_maturity = 0.0
+        if x.size >= 2 and not np.allclose(x, x[0]):
+            slope_per_year = float(np.polyfit(x, y, 1)[0])
+            log_x = np.log(x)
+            if not np.allclose(log_x, log_x[0]):
+                slope_per_log_maturity = float(np.polyfit(log_x, y, 1)[0])
+
+        return {
+            "iv_front": iv_front,
+            "iv_anchor": iv_anchor,
+            "iv_back": iv_back,
+            "front_to_anchor_ratio": float(iv_front / iv_anchor),
+            "anchor_to_back_ratio": float(iv_anchor / iv_back),
+            "front_minus_anchor": float(iv_front - iv_anchor),
+            "anchor_minus_back": float(iv_anchor - iv_back),
+            "slope_per_year": slope_per_year,
+            "slope_per_log_maturity": slope_per_log_maturity,
+            "curvature": float(iv_front - 2.0 * iv_anchor + iv_back),
+        }
+
+    def skew_term_metrics(
+        self,
+        front_target: float = 7.0 / 365.0,
+        anchor_target: float = 30.0 / 365.0,
+        back_target: float = 90.0 / 365.0,
+    ) -> Dict[str, float | None]:
+        """Return skew diagnostics across the term structure."""
+        if self.skew_by_maturity is None or self.skew_by_maturity.empty:
+            return {
+                "skew_front": None,
+                "skew_anchor": None,
+                "skew_back": None,
+                "skew_front_minus_anchor": None,
+                "skew_anchor_minus_back": None,
+                "skew_slope_per_year": None,
+            }
+
+        skew_front = self._nearest_skew(front_target)
+        skew_anchor = self._nearest_skew(anchor_target)
+        skew_back = self._nearest_skew(back_target)
+
+        x = np.asarray(self.skew_by_maturity.index, dtype=float)
+        y = np.asarray(self.skew_by_maturity.values, dtype=float)
+        skew_slope = 0.0
+        if x.size >= 2 and not np.allclose(x, x[0]):
+            skew_slope = float(np.polyfit(x, y, 1)[0])
+
+        return {
+            "skew_front": skew_front,
+            "skew_anchor": skew_anchor,
+            "skew_back": skew_back,
+            "skew_front_minus_anchor": float(skew_front - skew_anchor),
+            "skew_anchor_minus_back": float(skew_anchor - skew_back),
+            "skew_slope_per_year": skew_slope,
+        }
+
     def iv_percentile(self, lookback_days: int = 252) -> float:
         """Percentile rank of latest ATM IV in recent historical ATM series."""
         if self.historical_atm_iv is None or self.historical_atm_iv.empty:
@@ -131,3 +222,27 @@ class VolatilityAnalytics:
             "skew_signal": skew_signal,
             "total_signal": total,
         }
+
+    def summary(
+        self,
+        *,
+        hv_30d: float | None = None,
+        lookback_days: int = 252,
+    ) -> Dict[str, float | str | None]:
+        """
+        Return a report-ready analytics snapshot.
+
+        Optional inputs enrich the result with IV percentile and IV-vs-RV premium.
+        """
+        summary: Dict[str, float | str | None] = {
+            **self.term_structure_metrics(),
+            **self.skew_term_metrics(),
+            **self.trading_signal(),
+        }
+        summary["iv_percentile"] = (
+            self.iv_percentile(lookback_days=lookback_days)
+            if self.historical_atm_iv is not None and not self.historical_atm_iv.empty
+            else None
+        )
+        summary["vol_premium"] = self.vol_premium(hv_30d) if hv_30d is not None else None
+        return summary

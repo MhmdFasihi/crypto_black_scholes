@@ -57,7 +57,9 @@ This page groups the public API by workflow rather than mirroring the package fi
 - `gex_summary`
 - `VolatilitySurface`
 
-`VolatilitySurface` now includes smile-specific helpers such as `get_smile_slice()`, `get_skew()`, `get_risk_reversal()`, and `get_butterfly()`.
+`VolatilitySurface` now includes smile-specific helpers such as `get_smile_slice()`, `get_surface_grid()`, `describe_surface()`, `get_skew()`, `get_risk_reversal()`, and `get_butterfly()`.
+
+`VolatilityAnalytics` also exposes richer summary helpers including `term_structure_metrics()`, `skew_term_metrics()`, and `summary()`.
 
 ## Notes
 

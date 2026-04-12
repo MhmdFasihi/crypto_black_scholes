@@ -85,7 +85,7 @@ class DeribitClient:
             adapter = HTTPAdapter(max_retries=retry)
             self.session.mount("https://", adapter)
             self.session.mount("http://", adapter)
-        self.session.headers.setdefault("User-Agent", "crypto_bs/0.8.0")
+        self.session.headers.setdefault("User-Agent", "crypto_bs/0.9.0")
 
     def close(self) -> None:
         """Close the underlying HTTP session."""

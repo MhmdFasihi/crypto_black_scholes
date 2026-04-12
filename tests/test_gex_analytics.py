@@ -52,3 +52,40 @@ def test_volatility_analytics_regimes_and_signals():
     assert isinstance(va.vol_premium(0.55), float)
     signal = va.trading_signal()
     assert "total_signal" in signal
+
+
+def test_volatility_analytics_term_and_summary_metrics():
+    term = pd.Series(
+        data=[0.85, 0.72, 0.65],
+        index=[7 / 365, 30 / 365, 90 / 365],
+    )
+    skew = pd.Series(
+        data=[0.04, 0.035, 0.03],
+        index=[7 / 365, 30 / 365, 90 / 365],
+    )
+    hist = pd.Series(np.linspace(0.4, 0.9, 300))
+    va = VolatilityAnalytics(term, skew_by_maturity=skew, historical_atm_iv=hist)
+
+    ts = va.term_structure_metrics()
+    skew_metrics = va.skew_term_metrics()
+    summary = va.summary(hv_30d=0.55)
+
+    assert ts["front_to_anchor_ratio"] > 1.0
+    assert ts["anchor_to_back_ratio"] > 1.0
+    assert ts["slope_per_year"] < 0
+    assert skew_metrics["skew_front"] > skew_metrics["skew_back"]
+    assert summary["ts_regime"] == "BACKWARDATION"
+    assert summary["skew_regime"] == "STEEP"
+    assert summary["iv_percentile"] is not None
+    assert summary["vol_premium"] == term.iloc[1] - 0.55
+
+
+def test_volatility_analytics_skew_term_metrics_without_skew_series():
+    term = pd.Series(
+        data=[0.85, 0.72, 0.65],
+        index=[7 / 365, 30 / 365, 90 / 365],
+    )
+    va = VolatilityAnalytics(term)
+    skew_metrics = va.skew_term_metrics()
+    assert skew_metrics["skew_front"] is None
+    assert va.summary()["skew_regime"] == "UNKNOWN"
