@@ -3,6 +3,29 @@
 
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-04-12
+
+### Added
+
+- Expanded `VolatilitySurface` smile analytics with:
+  - `get_smile_slice(...)`
+  - `get_smile_metrics(...)`
+  - `get_risk_reversal(...)`
+  - `get_butterfly(...)`
+- `VolatilityAnalytics.from_surface(...)` for constructing analytics directly from a fitted surface.
+- New tests covering delta-aware skew/risk-reversal/butterfly metrics and analytics construction from a fitted surface.
+
+### Changed
+
+- `VolatilitySurface.fit()` now preserves optional chain metadata such as `underlying_price`, `option_type`, `risk_free_rate`, and `dividend_yield`.
+- Surface skew uses nearest-delta wing selection when metadata is available, with a strike-quantile fallback for simple strike/IV datasets.
+- GitHub workflow upgraded to Node 24 compatible action majors for `actions/checkout` and `actions/setup-python`.
+- Package version bumped to `0.8.0`.
+
+### Documentation
+
+- README and surface/analytics guides updated for smile slices, risk reversals, butterflies, and `VolatilityAnalytics.from_surface(...)`.
+
 ## [0.7.0] — 2026-04-10
 
 ### Added
@@ -151,6 +174,7 @@ All notable changes to **crypto_bs** are documented here. The format is based on
 
 - Initial public API: Black-76 and Black-Scholes with coin-settled adjustments, basic and portfolio Greeks, Deribit helpers, IV via Brent’s method, breakeven utilities.
 
+[0.8.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MhmdFasihi/crypto_black_scholes/compare/v0.4.0...v0.5.0

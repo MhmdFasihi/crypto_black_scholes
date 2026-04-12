@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
+
+if TYPE_CHECKING:
+    from .surface import VolatilitySurface
 
 
 @dataclass
@@ -27,6 +31,38 @@ class VolatilityAnalytics:
             raise ValueError("atm_term_structure cannot be empty")
         if (self.atm_term_structure <= 0).any():
             raise ValueError("atm_term_structure must be positive")
+
+    @classmethod
+    def from_surface(
+        cls,
+        surface: "VolatilitySurface",
+        *,
+        maturities: Optional[list[float]] = None,
+        historical_atm_iv: Optional[pd.Series] = None,
+        delta: float = 0.25,
+    ) -> "VolatilityAnalytics":
+        """
+        Construct analytics inputs directly from a fitted `VolatilitySurface`.
+
+        The resulting `skew_by_maturity` uses `surface.get_skew(...)`, which is
+        delta-aware when the surface was fit with `underlying_price` and
+        `option_type` columns.
+        """
+        term = surface.get_term_structure()
+        chosen_maturities = (
+            list(term.index.astype(float))
+            if maturities is None
+            else [float(maturity) for maturity in maturities]
+        )
+        skew = pd.Series(
+            {maturity: surface.get_skew(maturity, delta=delta) for maturity in chosen_maturities},
+            dtype=float,
+        ).sort_index()
+        return cls(
+            atm_term_structure=term,
+            skew_by_maturity=skew,
+            historical_atm_iv=historical_atm_iv,
+        )
 
     def _nearest_iv(self, target_t: float) -> float:
         idx = np.asarray(self.atm_term_structure.index, dtype=float)

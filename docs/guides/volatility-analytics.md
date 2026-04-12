@@ -41,6 +41,17 @@ print(va.skew_regime())
 print(va.trading_signal())
 ```
 
+You can also build analytics directly from a fitted surface:
+
+```python
+from crypto_bs import VolatilityAnalytics, VolatilitySurface
+
+surface = VolatilitySurface()
+surface.fit(chain_df)
+va = VolatilityAnalytics.from_surface(surface)
+print(va.ts_regime(), va.skew_regime())
+```
+
 ## IV vs RV
 
 To compare implied and realized volatility:

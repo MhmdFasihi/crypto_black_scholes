@@ -1,12 +1,14 @@
-"""Simple implied volatility surface utilities."""
+"""Implied volatility surface utilities and smile analytics."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
+
+from .black_scholes import BlackScholesModel, OptionParameters, OptionType
 
 
 @dataclass
@@ -21,31 +23,80 @@ class VolatilitySurface:
     """
 
     _by_t: Dict[float, pd.DataFrame] = field(default_factory=dict)
+    _raw_by_t: Dict[float, pd.DataFrame] = field(default_factory=dict)
     _term: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
+    _spot: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
+
+    def _require_fitted(self) -> None:
+        if not self._by_t:
+            raise ValueError("surface not fitted")
 
     def fit(self, chain_df: pd.DataFrame) -> None:
         required = {"strike", "time_to_maturity", "implied_volatility"}
+        optional = {"underlying_price", "option_type", "risk_free_rate", "dividend_yield"}
         missing = required.difference(chain_df.columns)
         if missing:
             raise ValueError(f"chain_df missing required columns: {sorted(missing)}")
         if chain_df.empty:
             raise ValueError("chain_df cannot be empty")
 
-        clean = chain_df[list(required)].copy()
-        clean = clean.dropna()
+        columns = ["strike", "time_to_maturity", "implied_volatility"] + [
+            column for column in ("underlying_price", "option_type", "risk_free_rate", "dividend_yield")
+            if column in chain_df.columns
+        ]
+        clean = chain_df[columns].copy()
+        clean = clean.dropna(subset=["strike", "time_to_maturity", "implied_volatility"])
         if (clean["implied_volatility"] <= 0).any():
             raise ValueError("implied_volatility must be positive")
+        if "underlying_price" in clean.columns:
+            valid_spot = clean["underlying_price"].dropna()
+            if not valid_spot.empty and (valid_spot <= 0).any():
+                raise ValueError("underlying_price must be positive when provided")
+        if "option_type" in clean.columns:
+            clean["option_type"] = clean["option_type"].astype(str).str.lower()
+            if not clean["option_type"].isin({"call", "put"}).all():
+                raise ValueError("option_type must be 'call' or 'put'")
+        if "risk_free_rate" in clean.columns:
+            clean["risk_free_rate"] = clean["risk_free_rate"].fillna(0.0)
+        if "dividend_yield" in clean.columns:
+            clean["dividend_yield"] = clean["dividend_yield"].fillna(0.0)
 
         self._by_t = {}
+        self._raw_by_t = {}
         term = {}
+        spot = {}
         for t, grp in clean.groupby("time_to_maturity"):
-            g = grp.sort_values("strike").reset_index(drop=True)
-            self._by_t[float(t)] = g
-            # ATM proxy: strike nearest median strike
-            k_med = float(g["strike"].median())
-            atm_idx = (g["strike"] - k_med).abs().idxmin()
-            term[float(t)] = float(g.loc[atm_idx, "implied_volatility"])
+            raw = grp.sort_values(["strike"] + (["option_type"] if "option_type" in grp.columns else [])).reset_index(drop=True)
+            aggregations: dict[str, Any] = {"implied_volatility": "mean"}
+            if "underlying_price" in raw.columns:
+                aggregations["underlying_price"] = "median"
+            if "risk_free_rate" in raw.columns:
+                aggregations["risk_free_rate"] = "mean"
+            if "dividend_yield" in raw.columns:
+                aggregations["dividend_yield"] = "mean"
+            smile = raw.groupby("strike", as_index=False).agg(aggregations).sort_values("strike").reset_index(drop=True)
+            t_float = float(t)
+            self._raw_by_t[t_float] = raw
+            self._by_t[t_float] = smile
+
+            reference_spot = self._reference_spot_from_frame(raw)
+            if reference_spot is not None:
+                spot[t_float] = reference_spot
+                atm_idx = (smile["strike"] - reference_spot).abs().idxmin()
+            else:
+                k_med = float(smile["strike"].median())
+                atm_idx = (smile["strike"] - k_med).abs().idxmin()
+            term[t_float] = float(smile.loc[atm_idx, "implied_volatility"])
         self._term = pd.Series(term).sort_index()
+        self._spot = pd.Series(spot).sort_index()
+
+    def _reference_spot_from_frame(self, frame: pd.DataFrame) -> float | None:
+        if "underlying_price" not in frame.columns:
+            return None
+        valid = frame["underlying_price"].dropna()
+        if valid.empty:
+            return None
+        return float(valid.median())
 
     def _interp_strike(self, t: float, strike: float) -> float:
         if t not in self._by_t:
@@ -55,10 +106,20 @@ class VolatilitySurface:
         y = g["implied_volatility"].to_numpy(dtype=float)
         return float(np.interp(strike, x, y))
 
+    def _nearest_time(self, time_to_maturity: float) -> float:
+        self._require_fitted()
+        return float(min(self._by_t.keys(), key=lambda t: abs(t - time_to_maturity)))
+
+    def _reference_spot(self, time_to_maturity: float) -> float | None:
+        if self._spot.empty:
+            return None
+        x = self._spot.index.to_numpy(dtype=float)
+        y = self._spot.values.astype(float)
+        return float(np.interp(time_to_maturity, x, y))
+
     def get_iv(self, strike: float, time_to_maturity: float) -> float:
         """Interpolate IV across strike, then linearly across maturities."""
-        if not self._by_t:
-            raise ValueError("surface not fitted")
+        self._require_fitted()
         t_values = np.array(sorted(self._by_t.keys()), dtype=float)
         if len(t_values) == 1:
             return self._interp_strike(float(t_values[0]), strike)
@@ -67,32 +128,149 @@ class VolatilitySurface:
 
     def get_atm_iv(self, time_to_maturity: float) -> float:
         """Return ATM IV from fitted term structure with linear interpolation."""
-        if self._term.empty:
-            raise ValueError("surface not fitted")
+        self._require_fitted()
         x = self._term.index.to_numpy(dtype=float)
         y = self._term.values.astype(float)
         return float(np.interp(time_to_maturity, x, y))
 
     def get_term_structure(self) -> pd.Series:
-        if self._term.empty:
-            raise ValueError("surface not fitted")
+        self._require_fitted()
         return self._term.copy()
 
-    def get_skew(self, time_to_maturity: float, delta: float = 0.25) -> float:
+    def get_smile_slice(
+        self,
+        time_to_maturity: float,
+        num_points: int = 21,
+        strike_grid: np.ndarray | list[float] | None = None,
+    ) -> pd.DataFrame:
+        """Return an interpolated smile slice with strike and moneyness columns."""
+        self._require_fitted()
+        nearest_t = self._nearest_time(time_to_maturity)
+        nearest_slice = self._by_t[nearest_t]
+        if strike_grid is None:
+            strikes = nearest_slice["strike"].to_numpy(dtype=float)
+            if num_points <= 0:
+                raise ValueError("num_points must be positive")
+            if len(strikes) == 1:
+                strike_grid_arr = np.array([strikes[0]], dtype=float)
+            else:
+                strike_grid_arr = np.linspace(float(strikes.min()), float(strikes.max()), num_points)
+            if len(strikes) > 1 and num_points == 1:
+                spot = self._reference_spot(time_to_maturity)
+                center = float(np.median(strikes)) if spot is None else float(spot)
+                strike_grid_arr = np.array([center], dtype=float)
+        else:
+            strike_grid_arr = np.asarray(strike_grid, dtype=float)
+            if strike_grid_arr.size == 0:
+                raise ValueError("strike_grid cannot be empty")
+
+        spot = self._reference_spot(time_to_maturity)
+        smile = pd.DataFrame(
+            {
+                "strike": strike_grid_arr,
+                "implied_volatility": [
+                    self.get_iv(float(strike), time_to_maturity) for strike in strike_grid_arr
+                ],
+            }
+        )
+        if spot is None or spot <= 0:
+            smile["moneyness"] = np.nan
+            smile["log_moneyness"] = np.nan
+        else:
+            smile["moneyness"] = smile["strike"] / spot
+            smile["log_moneyness"] = np.log(smile["strike"] / spot)
+        return smile
+
+    def _delta_metrics(self, time_to_maturity: float, delta: float) -> dict[str, float] | None:
+        if not 0 < delta < 0.5:
+            raise ValueError("delta must be between 0 and 0.5")
+        nearest_t = self._nearest_time(time_to_maturity)
+        frame = self._raw_by_t[nearest_t]
+        if "option_type" not in frame.columns or "underlying_price" not in frame.columns:
+            return None
+
+        bs_model = BlackScholesModel()
+        result: dict[str, float] = {"atm_iv": self.get_atm_iv(time_to_maturity)}
+        for option_type, target_delta in (("call", delta), ("put", -delta)):
+            subset = frame[frame["option_type"] == option_type]
+            if subset.empty:
+                return None
+            best: tuple[float, float, float] | None = None
+            for _, row in subset.iterrows():
+                spot = row.get("underlying_price")
+                if pd.isna(spot) or float(spot) <= 0:
+                    continue
+                params = OptionParameters(
+                    spot_price=float(spot),
+                    strike_price=float(row["strike"]),
+                    time_to_maturity=float(nearest_t),
+                    volatility=float(row["implied_volatility"]),
+                    risk_free_rate=float(row.get("risk_free_rate", 0.0)),
+                    dividend_yield=float(row.get("dividend_yield", 0.0)),
+                    option_type=OptionType.CALL if option_type == "call" else OptionType.PUT,
+                    is_coin_based=False,
+                )
+                row_delta = bs_model.calculate_option_price(params).delta_usd
+                candidate = (
+                    abs(row_delta - target_delta),
+                    float(row["implied_volatility"]),
+                    float(row["strike"]),
+                )
+                if best is None or candidate[0] < best[0]:
+                    best = candidate
+            if best is None:
+                return None
+            result[f"{option_type}_iv"] = best[1]
+            result[f"{option_type}_strike"] = best[2]
+        result["risk_reversal"] = result["call_iv"] - result["put_iv"]
+        result["skew"] = result["put_iv"] - result["call_iv"]
+        result["butterfly"] = 0.5 * (result["put_iv"] + result["call_iv"]) - result["atm_iv"]
+        return result
+
+    def get_smile_metrics(self, time_to_maturity: float, delta: float = 0.25) -> dict[str, float]:
         """
-        Approximate skew as IV(low strike) - IV(high strike) around ATM.
-        Uses a strike percentile proxy based on `delta`.
+        Return smile metrics for the requested maturity.
+
+        If the fitted data includes `underlying_price` and `option_type`, metrics
+        are computed using nearest-delta wings. Otherwise a strike-quantile proxy
+        is used as a fallback.
         """
-        if not self._by_t:
-            raise ValueError("surface not fitted")
-        nearest_t = min(self._by_t.keys(), key=lambda tt: abs(tt - time_to_maturity))
+        metrics = self._delta_metrics(time_to_maturity, delta)
+        if metrics is not None:
+            return metrics
+
+        nearest_t = self._nearest_time(time_to_maturity)
         g = self._by_t[nearest_t]
         strikes = g["strike"].to_numpy(dtype=float)
         q_low = np.quantile(strikes, max(0.0, delta))
         q_high = np.quantile(strikes, min(1.0, 1 - delta))
-        iv_low = self._interp_strike(float(nearest_t), float(q_low))
-        iv_high = self._interp_strike(float(nearest_t), float(q_high))
-        return float(iv_low - iv_high)
+        put_iv = self._interp_strike(float(nearest_t), float(q_low))
+        call_iv = self._interp_strike(float(nearest_t), float(q_high))
+        atm_iv = self.get_atm_iv(time_to_maturity)
+        return {
+            "put_iv": float(put_iv),
+            "call_iv": float(call_iv),
+            "put_strike": float(q_low),
+            "call_strike": float(q_high),
+            "atm_iv": float(atm_iv),
+            "risk_reversal": float(call_iv - put_iv),
+            "skew": float(put_iv - call_iv),
+            "butterfly": float(0.5 * (put_iv + call_iv) - atm_iv),
+        }
+
+    def get_skew(self, time_to_maturity: float, delta: float = 0.25) -> float:
+        """
+        Return put-minus-call skew at the requested maturity.
+        """
+        return float(self.get_smile_metrics(time_to_maturity, delta=delta)["skew"])
+
+    def get_risk_reversal(self, time_to_maturity: float, delta: float = 0.25) -> float:
+        """Return call-minus-put risk reversal at the requested maturity."""
+        return float(self.get_smile_metrics(time_to_maturity, delta=delta)["risk_reversal"])
+
+    def get_butterfly(self, time_to_maturity: float, delta: float = 0.25) -> float:
+        """Return the wing-average minus ATM butterfly metric."""
+        return float(self.get_smile_metrics(time_to_maturity, delta=delta)["butterfly"])
 
     def check_arbitrage(self) -> Dict[str, List[str]]:
         """

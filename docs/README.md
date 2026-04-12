@@ -1,6 +1,6 @@
 # crypto_bs Documentation
 
-This directory contains the local documentation set for `crypto_bs`, organized as a practical developer guide for release `0.7.0`.
+This directory contains the local documentation set for `crypto_bs`, organized as a practical developer guide for release `0.8.0`.
 
 ## Contents
 
@@ -24,7 +24,7 @@ This directory contains the local documentation set for `crypto_bs`, organized a
 
 ## Version
 
-This documentation targets **v0.7.0**.
+This documentation targets **v0.8.0**.
 
 ## Notes
 

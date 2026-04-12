@@ -57,6 +57,8 @@ This page groups the public API by workflow rather than mirroring the package fi
 - `gex_summary`
 - `VolatilitySurface`
 
+`VolatilitySurface` now includes smile-specific helpers such as `get_smile_slice()`, `get_skew()`, `get_risk_reversal()`, and `get_butterfly()`.
+
 ## Notes
 
 - Time-to-maturity is expressed in years.
