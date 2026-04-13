@@ -110,7 +110,7 @@ def test_get_btc_volatility_delegates_to_default_client(monkeypatch):
 
 
 def test_public_api_version_and_exports():
-    assert crypto_bs.__version__ == "0.9.0"
+    assert crypto_bs.__version__ == "1.0.0"
     assert hasattr(crypto_bs, "DeribitClient")
     assert hasattr(crypto_bs, "PortfolioAnalyzer")
 

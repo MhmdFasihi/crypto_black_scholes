@@ -48,12 +48,25 @@ client = DeribitClient()
 chain = client.get_iv_surface_data(min_open_interest=100)
 
 surface = VolatilitySurface()
-surface.fit(chain[["strike", "time_to_maturity", "implied_volatility"]])
+surface.fit(chain)
 print(surface.get_atm_iv(30 / 365))
 ```
+
+## First interactive plot (new in v1.0)
+
+```python
+from crypto_bs import plot_volatility_surface
+
+fig = plot_volatility_surface(surface)
+fig.show()          # opens in browser
+fig.write_html("surface.html")  # save to file
+```
+
+All four visualization functions (`plot_volatility_surface`, `plot_smile_slice`, `plot_term_structure`, `plot_gex`) return a `plotly.graph_objects.Figure`. No `.show()` is called inside the library.
 
 ## Next reads
 
 - [Core Concepts](core-concepts.md)
 - [Pricing Guide](pricing-guide.md)
 - [Data and Market Inputs](data-and-market-inputs.md)
+- [Visualization Guide](visualization.md)

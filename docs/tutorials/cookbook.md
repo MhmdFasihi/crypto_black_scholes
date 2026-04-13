@@ -51,3 +51,64 @@ analytics = VolatilityAnalytics(atm_term_structure=term)
 rv = client.get_btc_volatility(days=120, window=30)
 print(analytics.summary(hv_30d=rv))
 ```
+
+## Recipe: Interactive 3-D IV surface (new in v1.0)
+
+```python
+from crypto_bs import DeribitClient, VolatilitySurface, plot_volatility_surface
+
+client = DeribitClient()
+surface_input = client.get_iv_surface_data(min_open_interest=100)
+
+surface = VolatilitySurface()
+surface.fit(surface_input)
+
+fig = plot_volatility_surface(surface, num_strikes=40, title="BTC IV Surface")
+fig.show()                       # opens in browser
+fig.write_html("btc_surface.html")  # save for sharing
+```
+
+## Recipe: Smile slices + term structure dashboard
+
+```python
+from crypto_bs import (
+    VolatilityAnalytics,
+    VolatilitySurface,
+    plot_smile_slice,
+    plot_term_structure,
+)
+
+surface = VolatilitySurface()
+surface.fit(surface_input)
+analytics = VolatilityAnalytics.from_surface(surface)
+
+# Smile curves for near-term expirations
+fig_smile = plot_smile_slice(surface, maturities=[7/365, 14/365, 30/365])
+fig_smile.show()
+
+# ATM term structure with 25-delta skew overlay
+fig_ts = plot_term_structure(surface, analytics=analytics)
+fig_ts.show()
+```
+
+## Recipe: GEX chart with gamma flip
+
+```python
+from crypto_bs import (
+    DeribitClient,
+    compute_gex,
+    find_gamma_flip,
+    get_btc_forward_price,
+    plot_gex,
+)
+
+client = DeribitClient()
+chain = client.get_full_chain(min_open_interest=50)
+spot = get_btc_forward_price()
+
+gex_df = compute_gex(chain, spot=spot)
+flip = find_gamma_flip(gex_df)
+
+fig = plot_gex(gex_df, spot=spot, gamma_flip=flip)
+fig.show()
+```

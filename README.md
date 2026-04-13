@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 0.9.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, first-class portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, and a richer implied-volatility surface and smile-analytics layer with export-ready diagnostics.
+**Version 1.0.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, an implied-volatility surface layer with smile analytics, and **interactive Plotly visualizations**.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 See **[docs/README.md](docs/README.md)** for the local documentation index.
@@ -12,19 +12,20 @@ See **[docs/README.md](docs/README.md)** for the local documentation index.
 - **Portfolio** — Multi-position Greeks, risk metrics, gamma exposure profile
 - **Portfolio reports** — Position breakdowns, concentration metrics, stress tests, and scenario-based VaR/CVaR
 - **Data** — Deribit REST helpers, reusable `DeribitClient`, normalized chain/surface fetchers, CoinGecko-backed BTC spot and realized-vol helpers
-- **IV** — Implied vol from market price (Brent’s method), intrinsic and bounds checks
+- **IV** — Implied vol from market price (Brent's method), intrinsic and bounds checks
 - **Vectorized chain pricing** — `price_options_vectorized` for many strikes / expiries at once
 - **Breakeven** — USD and coin-settled breakeven helpers
 - **Historical volatility** — Close-to-close, Parkinson, Rogers-Satchell, Yang-Zhang estimators
 - **GEX analytics** — Net gamma exposure by strike, cumulative GEX, gamma flip point
-- **Volatility regimes** — Term-structure and skew regime classifier with report-ready metrics and simple signal synthesis
+- **Volatility regimes** — Term-structure and skew regime classifier with configurable thresholds, report-ready metrics, and simple signal synthesis
 - **Volatility surface analytics** — Fit/interpolate IV over strike and maturity, extract smile slices, export dense surface grids, and compute skew/risk-reversal/butterfly metrics
+- **Interactive visualization** — Four Plotly functions: 3-D IV surface, per-maturity smile slices, ATM term-structure with skew overlay, and GEX bar chart
 
 ## Model overview
 
 1. **Black-76 (module-level `price_option`)** — Forward `F`, undiscounted coin premium; suited to Deribit-style quoting.
 2. **`BlackScholesModel`** — Spot-based Merton BS; **`is_coin_based=True`** for premium as fraction of spot; exposes **`delta_usd`** (hedge delta) and **`delta_coin`** (premium sensitivity to spot).
-3. **Portfolio** — Aggregations use **USD delta** per position for `total_delta` and dollar exposures.
+3. **Portfolio** — Aggregations use **USD delta** per position for `total_delta` and dollar exposures; VaR uses log-normal spot returns for multi-day horizons.
 
 ## Installation
 
@@ -38,7 +39,7 @@ Import as:
 import crypto_bs
 ```
 
-Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests` (see `pyproject.toml`).
+Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests`, `plotly` (see `pyproject.toml`).
 
 ## Documentation
 
@@ -47,14 +48,17 @@ Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests` (see `pyproject.
 - [Data and market inputs](docs/guides/data-and-market-inputs.md)
 - [Portfolio risk guide](docs/guides/portfolio-risk-report.md)
 - [Volatility surface guide](docs/guides/volatility-surface.md)
+- [Visualization guide](docs/guides/visualization.md)
 - [Cookbook](docs/tutorials/cookbook.md)
 
-## Upgrading from 0.1.x
+## Upgrading from 0.x
 
-- Replace **`result.delta`** with **`result.delta_usd`** (hedging / notional delta) and/or **`result.delta_coin`** (academic / premium-in-coin sensitivity).
-- Dicts from **`price_coin_based_option`** / **`validate_deribit_pricing`**: use **`delta_usd`** / **`delta_coin`** instead of **`delta`**.
-- **`get_btc_volatility()`** now computes realized volatility from CoinGecko daily closes; for exchange-specific studies, prefer feeding your own OHLC data into `crypto_bs.historical_vol`.
-- Optional: add **`pytest`** to your environment for the test suite (`pip install pytest`).
+- Replace **`result.delta`** with **`result.delta_usd`** (hedging delta) and/or **`result.delta_coin`** (coin-premium delta).
+- Dicts from **`price_coin_based_option`** / **`validate_deribit_pricing`**: use **`delta_usd`** / **`delta_coin`** instead of `delta`.
+- **`PortfolioPosition.risk_free_rate`** now defaults to `0.0` (was `0.05`). For coin-settled crypto options r≈0 is correct. Update any code relying on the old default.
+- `skew_regime()` and `ts_regime()` now accept threshold override parameters; behavior with default args is the same unless you relied on the old asymmetric `INVERTED` at −1 vol point.
+- **`get_btc_volatility()`** computes realized volatility from CoinGecko daily closes; for exchange-specific studies, prefer feeding your own OHLC data into `crypto_bs.historical_vol`.
+- New dependency: **`plotly>=5.0.0`** — install it before importing visualization functions.
 
 ## Quick start
 
@@ -160,8 +164,6 @@ validation = validate_deribit_pricing(
 )
 print("IV:", validation["implied_volatility"])
 print("Delta USD:", validation["delta_usd"])
-print("Chain rows:", len(chain))
-print("Surface rows:", len(surface_input))
 ```
 
 Requests use a **10-second timeout**; the client adds retries, short-lived caching, and lightweight pacing for repeated Deribit calls. Failures surface as `requests` exceptions or `ValueError` from the helpers.
@@ -172,7 +174,6 @@ Requests use a **10-second timeout**; the client adds retries, short-lived cachi
 import pandas as pd
 from crypto_bs import close_to_close_hv, get_btc_volatility, parkinson_hv, yang_zhang_hv
 
-# Example OHLC arrays as pandas Series
 close = pd.Series([100, 102, 101, 104, 103, 106, 108])
 high = close * 1.01
 low = close * 0.99
@@ -233,6 +234,40 @@ analytics = VolatilityAnalytics.from_surface(surface)
 print(analytics.summary())
 ```
 
+### Interactive visualization (new in v1.0)
+
+All four functions return a `plotly.graph_objects.Figure`. Call `.show()` to open in browser, or `.write_html()` to export.
+
+```python
+from crypto_bs import (
+    plot_volatility_surface,
+    plot_smile_slice,
+    plot_term_structure,
+    plot_gex,
+)
+
+# 3-D IV surface
+fig = plot_volatility_surface(surface)
+fig.show()
+
+# Smile slices — one line per maturity
+fig = plot_smile_slice(surface)
+fig.show()
+
+# ATM term structure with optional skew overlay
+fig = plot_term_structure(surface, analytics=analytics)
+fig.show()
+
+# GEX bar chart
+from crypto_bs import compute_gex, find_gamma_flip
+gex_df = compute_gex(chain, spot=100000)
+flip = find_gamma_flip(gex_df)
+fig = plot_gex(gex_df, spot=100000, gamma_flip=flip)
+fig.show()
+```
+
+All functions accept `template` (default `"plotly_dark"`) and `title` kwargs. No side effects — `.show()` is never called inside the library.
+
 ## API reference (summary)
 
 | Symbol | Role |
@@ -252,38 +287,34 @@ print(analytics.summary())
 | `get_btc_volatility` | Realized volatility from CoinGecko daily closes |
 | `close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`, `vol_premium` | Historical volatility analytics |
 | `compute_gex`, `find_gamma_flip`, `gex_summary` | Gamma exposure analytics |
-| `VolatilityAnalytics` | Term-structure/skew metrics, regimes, and summary signal snapshot |
+| `VolatilityAnalytics` | Term-structure/skew metrics, configurable regimes, and summary signal snapshot |
 | `VolatilitySurface` | IV surface fit/interpolation, smile slices, plot-ready grids, maturity summaries, and sanity checks |
+| `plot_volatility_surface` | Interactive 3-D IV surface (Plotly) |
+| `plot_smile_slice` | 2-D smile curves per maturity (Plotly) |
+| `plot_term_structure` | ATM IV term structure with optional skew overlay (Plotly) |
+| `plot_gex` | GEX bar chart by strike (Plotly) |
 
 Full signatures and defaults are in the source docstrings.
-
-## Validation (example)
-
-Using real Deribit-style numbers, model vs mark can be on the order of **~1%** in BTC premium depending on mark, forward, and IV; use `validate_deribit_pricing` and live `get_option_data` for your own checks.
 
 ## Testing
 
 ```bash
-# From repo root (recommended)
+# With conda (recommended)
+conda activate crypto-option
 pytest tests/ -v
 
-# With conda
-conda activate crypto-option
-cd /path/to/crypto_bs_project
-PYTHONPATH=. pytest tests/ -v
-
-# Wrapper script
-python run_tests.py
+# Standard
+pytest tests/ -v
 ```
 
-The suite includes **50** tests (pricing, Greeks, IV, historical vol, GEX, surface/data checks, analytics summaries, and portfolio reporting). Install **pytest** if it is not already in the environment.
+The suite includes **67** tests covering pricing, Greeks, IV, historical vol, GEX, surface, analytics, portfolio reporting, and all four visualization functions.
 
 ## License and links
 
-- License: see **LICENSE** in the repository.
+- License: **MIT** — see `LICENSE` in the repository.
 - Repository: [github.com/MhmdFasihi/crypto_black_scholes](https://github.com/MhmdFasihi/crypto_black_scholes)
 - **Changes / migration:** [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-Built for cryptocurrency options workflows that need **coin-settled** premiums, explicit **hedge delta vs coin-premium delta**, and **portfolio** Greeks.
+Built for cryptocurrency options workflows that need **coin-settled** premiums, explicit **hedge delta vs coin-premium delta**, **portfolio** Greeks, and **interactive surface visualization**.

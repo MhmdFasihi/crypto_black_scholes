@@ -2,7 +2,7 @@
 
 ## Fit a surface
 
-`VolatilitySurface` now provides a lightweight interpolation layer over strike and maturity plus smile-oriented wing metrics, along with export-ready grid and summary helpers:
+`VolatilitySurface` provides a lightweight interpolation layer over strike and maturity plus smile-oriented wing metrics, export-ready grids, and summary diagnostics:
 
 ```python
 import pandas as pd
@@ -37,27 +37,57 @@ bf = surface.get_butterfly(30 / 365)
 checks = surface.check_arbitrage()
 ```
 
-## Live input path
+`check_arbitrage()` enforces **total variance monotonicity** (`T × σ²(T)` non-decreasing) as the calendar-spread no-arbitrage condition and a convexity check on each smile slice.
 
-For a live-ish build pipeline:
+## Live input path
 
 ```python
 from crypto_bs import DeribitClient
 
 client = DeribitClient()
 surface_input = client.get_iv_surface_data(min_open_interest=100)
-surface.fit(surface_input[["strike", "time_to_maturity", "implied_volatility"]])
+surface.fit(surface_input)
 ```
+
+## Visualize the surface (new in v1.0)
+
+```python
+from crypto_bs import (
+    VolatilityAnalytics,
+    plot_volatility_surface,
+    plot_smile_slice,
+    plot_term_structure,
+)
+
+# Interactive 3-D surface
+fig = plot_volatility_surface(surface, num_strikes=40, title="BTC IV Surface")
+fig.show()
+
+# Smile curves — one line per fitted maturity
+fig = plot_smile_slice(surface)
+fig.show()
+
+# ATM term structure with 25-delta skew overlay
+analytics = VolatilityAnalytics.from_surface(surface)
+fig = plot_term_structure(surface, analytics=analytics)
+fig.show()
+```
+
+All three functions return `plotly.graph_objects.Figure`. Pass `template="plotly_white"` for a light theme.
 
 ## Scope
 
 This release keeps the surface intentionally simple:
 
-- interpolation by strike within fitted maturities
-- linear interpolation across maturities
-- export of long-form surface grids for charting or downstream analysis
-- report-ready maturity summaries from `describe_surface()`
-- delta-aware wing metrics when `underlying_price` and `option_type` are available
-- basic smile and calendar consistency checks
+- Interpolation by strike within fitted maturities; linear interpolation across maturities.
+- Export of long-form surface grids via `get_surface_grid()` for downstream analysis.
+- Report-ready maturity summaries from `describe_surface()`.
+- Delta-aware wing metrics when `underlying_price` and `option_type` are available in the input chain.
+- Calendar and butterfly consistency checks.
 
-It is not yet a parametrized SVI/SABR surface.
+It is not yet a parametrized SVI/SABR surface. Calibrated surface fitting is on the roadmap for v1.1.
+
+## See also
+
+- [Visualization Guide](visualization.md) — full reference for all four plot functions.
+- [Volatility Analytics Guide](volatility-analytics.md) — regime classification and signal synthesis.

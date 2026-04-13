@@ -374,25 +374,50 @@ class VolatilitySurface:
 
     def check_arbitrage(self) -> Dict[str, List[str]]:
         """
-        Basic consistency checks (not full no-arbitrage proof).
-        - Butterfly proxy: IV should be reasonably smooth by strike.
-        - Calendar proxy: ATM IV shouldn't jump excessively between adjacent maturities.
+        Basic consistency checks (not a full no-arbitrage proof).
+
+        Butterfly proxy:
+            Checks that the second finite difference of IV over strike is
+            below a loose threshold.  A full static arbitrage check would
+            require convexity of total variance in log-moneyness space; this
+            is a lightweight heuristic only.
+
+        Calendar check:
+            Enforces that total variance T*sigma^2(T) is non-decreasing in T.
+            This is the necessary condition for the absence of calendar-spread
+            arbitrage: a shorter-dated option cannot be worth more than a
+            longer-dated option at the same strike.
         """
-        issues = {"butterfly": [], "calendar": []}
+        issues: Dict[str, List[str]] = {"butterfly": [], "calendar": []}
         if not self._by_t:
             return issues
+
+        # --- butterfly proxy ---
         for t, g in self._by_t.items():
             iv = g["implied_volatility"].to_numpy(dtype=float)
             if len(iv) >= 3:
                 second_diff = np.diff(iv, n=2)
                 if np.any(np.abs(second_diff) > 0.35):
-                    issues["butterfly"].append(f"irregular smile curvature at T={t:.6f}")
+                    issues["butterfly"].append(
+                        f"irregular smile curvature at T={t:.6f} "
+                        f"(max |Δ²IV| = {float(np.abs(second_diff).max()):.4f})"
+                    )
+
+        # --- calendar check via total variance monotonicity ---
         if len(self._term) >= 2:
-            ts = self._term.sort_index()
-            jumps = np.abs(np.diff(ts.values.astype(float)))
-            for i, j in enumerate(jumps):
-                if j > 0.25:
-                    t0 = ts.index[i]
-                    t1 = ts.index[i + 1]
-                    issues["calendar"].append(f"large ATM-IV jump between T={t0:.6f} and T={t1:.6f}")
+            ts_sorted = self._term.sort_index()
+            t_vals = ts_sorted.index.to_numpy(dtype=float)
+            iv_vals = ts_sorted.values.astype(float)
+            total_var = t_vals * iv_vals ** 2
+            diffs = np.diff(total_var)
+            for i, d in enumerate(diffs):
+                if d < -1e-6:
+                    t0 = ts_sorted.index[i]
+                    t1 = ts_sorted.index[i + 1]
+                    issues["calendar"].append(
+                        f"calendar arbitrage: total variance decreases from "
+                        f"T={t0:.4f} ({total_var[i]:.6f}) to "
+                        f"T={t1:.4f} ({total_var[i + 1]:.6f})"
+                    )
+
         return issues

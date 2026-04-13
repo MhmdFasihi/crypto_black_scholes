@@ -29,6 +29,12 @@ from .portfolio import (
     stress_test_portfolio,
 )
 from .surface import VolatilitySurface
+from .visualization import (
+    plot_volatility_surface,
+    plot_smile_slice,
+    plot_term_structure,
+    plot_gex,
+)
 
 # Advanced implementations
 from .black_scholes import (
@@ -52,6 +58,7 @@ __all__ = [
     'vol_premium',
     'compute_gex', 'find_gamma_flip', 'gex_summary', 'VolatilityAnalytics',
     'VolatilitySurface', 'DeribitClient',
+    'plot_volatility_surface', 'plot_smile_slice', 'plot_term_structure', 'plot_gex',
 
     # Advanced classes
     'BlackScholesModel', 'Black76Model', 'OptionParameters', 'OptionPricing',
@@ -66,4 +73,4 @@ __all__ = [
 ]
 
 
-__version__ = "0.9.0"
+__version__ = "1.0.0"

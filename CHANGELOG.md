@@ -3,6 +3,36 @@
 
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-04-12
+
+### Added
+
+- **`crypto_bs/visualization.py`** — interactive Plotly visualization module with four public functions:
+  - `plot_volatility_surface(surface)` — interactive 3-D implied volatility surface (strike × days-to-expiry × IV %).
+  - `plot_smile_slice(surface, maturities)` — 2-D smile curves, one line per maturity.
+  - `plot_term_structure(surface, analytics)` — ATM IV vs days-to-expiry with optional 25-delta skew overlay on a secondary axis.
+  - `plot_gex(gex_df, spot, gamma_flip)` — GEX bar chart by strike with spot and gamma-flip reference lines.
+  - All functions return `plotly.graph_objects.Figure`; no side effects, no `.show()` inside.
+- `plotly>=5.0.0` added to package dependencies in `pyproject.toml`.
+- All four visualization functions exported from `crypto_bs` top-level.
+- New test file `tests/test_visualization.py` with smoke tests covering return types, trace counts, and error paths.
+- `VolatilityAnalytics.skew_regime()` and `ts_regime()` now accept threshold override parameters, making regime classification configurable per asset. Default thresholds are documented as BTC-specific.
+- Full quant-developer audit document at `review/CRYPTO_BS_AUDIT.md` — line-by-line formula verification of all pricing, Greeks, HV estimators, VaR/CVaR, and GEX at v0.9.0 state.
+
+### Fixed
+
+- **BUG-01 (MEDIUM):** VaR/CVaR simulation now uses log-normal spot returns (`exp(σ√dt·Z)`) instead of the arithmetic approximation (`1 + σ√dt·Z`). The arithmetic form materially underestimates right-tail spot levels for horizons beyond ~5 days.
+- **BUG-02 (MEDIUM):** Default `spot_volatility` in `estimate_var_cvar()` is now weighted by absolute vega exposure (`|qty| × |vega|`) instead of notional (`|qty × spot_price|`). Vega-weighting more correctly captures which positions drive the simulation's volatility scale.
+- **BUG-05 (LOW):** `VolatilitySurface.check_arbitrage()` calendar check now enforces total variance monotonicity (`T × σ²(T)` must be non-decreasing) instead of an absolute ATM IV jump threshold. This is the necessary condition for absence of calendar-spread arbitrage.
+- **BUG-09 (INFO):** `PortfolioPosition.risk_free_rate` default changed from `0.05` to `0.0`. For coin-settled crypto options, r ≈ 0 is the correct assumption. **Breaking change** for any code relying on the old default.
+- **License:** Removed AGPLv3 / commercial dual-license comment from `crypto_bs/black_scholes.py` header. All files now consistently state MIT license, matching `pyproject.toml` and `LICENSE`.
+
+### Changed
+
+- Package version bumped to `1.0.0`.
+
+---
+
 ## [0.9.0] — 2026-04-12
 
 ### Added

@@ -179,28 +179,60 @@ class VolatilityAnalytics:
         iv_30d = self._nearest_iv(30.0 / 365.0)
         return float(iv_30d - hv_30d)
 
-    def skew_regime(self) -> str:
-        """Classify skew regime from nearest 30d skew."""
+    def skew_regime(
+        self,
+        steep_threshold: float = 0.03,
+        inverted_threshold: float = -0.03,
+        target_maturity: float = 30.0 / 365.0,
+    ) -> str:
+        """Classify skew regime from nearest target-maturity skew.
+
+        Defaults are calibrated for BTC options where persistent put premium
+        is normal.  For other assets (ETH, altcoins, FX), adjust thresholds
+        to reflect the asset's typical skew baseline.
+
+        Args:
+            steep_threshold: Skew above this value → "STEEP".  Default 0.03
+                (3 vol points put over call).
+            inverted_threshold: Skew below this value → "INVERTED".  Default
+                -0.03 (3 vol points call over put).  Symmetric with steep_threshold
+                by default; override independently as needed.
+            target_maturity: Maturity (years) to read skew from.  Default 30d.
+        """
         if self.skew_by_maturity is None or self.skew_by_maturity.empty:
             return "UNKNOWN"
         idx = np.asarray(self.skew_by_maturity.index, dtype=float)
         vals = np.asarray(self.skew_by_maturity.values, dtype=float)
-        nearest = int(np.abs(idx - (30.0 / 365.0)).argmin())
+        nearest = int(np.abs(idx - target_maturity).argmin())
         skew = float(vals[nearest])
-        if skew > 0.03:
+        if skew > steep_threshold:
             return "STEEP"
-        if skew < -0.01:
+        if skew < inverted_threshold:
             return "INVERTED"
         return "NORMAL"
 
-    def ts_regime(self) -> str:
-        """Term-structure regime using 7d/30d ATM ratio."""
-        iv_7d = self._nearest_iv(7.0 / 365.0)
-        iv_30d = self._nearest_iv(30.0 / 365.0)
-        ratio = iv_7d / iv_30d
-        if ratio > 1.05:
+    def ts_regime(
+        self,
+        backwardation_threshold: float = 1.05,
+        contango_threshold: float = 0.95,
+        front_maturity: float = 7.0 / 365.0,
+        anchor_maturity: float = 30.0 / 365.0,
+    ) -> str:
+        """Term-structure regime using front/anchor ATM IV ratio.
+
+        Args:
+            backwardation_threshold: Ratio above this → "BACKWARDATION".
+                Default 1.05 (front IV > 5% above anchor).
+            contango_threshold: Ratio below this → "CONTANGO".  Default 0.95.
+            front_maturity: Short-dated maturity to use as numerator.  Default 7d.
+            anchor_maturity: Reference maturity as denominator.  Default 30d.
+        """
+        iv_front = self._nearest_iv(front_maturity)
+        iv_anchor = self._nearest_iv(anchor_maturity)
+        ratio = iv_front / iv_anchor
+        if ratio > backwardation_threshold:
             return "BACKWARDATION"
-        if ratio < 0.95:
+        if ratio < contango_threshold:
             return "CONTANGO"
         return "FLAT"
 

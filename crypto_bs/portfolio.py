@@ -34,7 +34,7 @@ class PortfolioPosition:
     option_type: str
     underlying: str = "UNKNOWN"
     is_coin_based: bool = False
-    risk_free_rate: float = 0.05
+    risk_free_rate: float = 0.0
     dividend_yield: float = 0.0
     label: str | None = None
 
@@ -394,9 +394,17 @@ class PortfolioAnalyzer:
 
         base_value = float(self.position_breakdown(normalized)["position_value"].sum())
         if spot_volatility is None:
+            # Weight each position's IV by its absolute vega exposure (qty × vega).
+            # Vega-weighting ensures positions that are most sensitive to volatility
+            # moves anchor the simulation's spot-shock scale, which is more economically
+            # correct than notional-weighting (which over-weights high-IV OTM options).
+            vega_weights = []
+            for position in normalized:
+                pricing = self.bs_model.calculate_option_price(self._to_option_parameters(position))
+                vega_weights.append(abs(float(pricing.vega)) * abs(position.quantity))
             spot_volatility = _weighted_average(
                 [position.volatility for position in normalized],
-                [position.quantity * position.spot_price for position in normalized],
+                vega_weights,
             )
 
         dt = horizon_days / 365.0
@@ -420,8 +428,11 @@ class PortfolioAnalyzer:
             shocked_value = 0.0
             for position in normalized:
                 spot_return, vol_shift = shock_by_underlying[position.underlying]
+                # Log-normal spot return: exp(σ√dt·Z).
+                # The arithmetic approximation 1+σ√dt·Z underestimates right-tail
+                # spot levels for horizons beyond ~5 days (bias ≈ ½σ²dt).
                 shocked_spot = max(
-                    position.spot_price * (1.0 + float(spot_return[scenario_idx])),
+                    position.spot_price * np.exp(float(spot_return[scenario_idx])),
                     1e-12,
                 )
                 shocked_vol = max(

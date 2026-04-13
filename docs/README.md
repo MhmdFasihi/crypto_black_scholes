@@ -1,6 +1,6 @@
 # crypto_bs Documentation
 
-This directory contains the local documentation set for `crypto_bs`, organized as a practical developer guide for release `0.9.0`.
+This directory contains the local documentation set for `crypto_bs`, organized as a practical developer guide for release **1.0.0**.
 
 ## Contents
 
@@ -13,21 +13,23 @@ This directory contains the local documentation set for `crypto_bs`, organized a
 - [Volatility Analytics](guides/volatility-analytics.md)
 - [Volatility Surface Guide](guides/volatility-surface.md)
 - [GEX Guide](guides/gex-guide.md)
+- [Visualization Guide](guides/visualization.md)
 - [Cookbook / Recipes](tutorials/cookbook.md)
 - [API Reference](api/reference.md)
 
 ## Who should read what?
 
 - New users: start at **Getting Started** and **Pricing Guide**.
-- Traders/analysts: jump to **Risk and Greeks**, **Portfolio Risk Guide**, **Volatility Analytics**, and **GEX Guide**.
+- Traders/analysts: jump to **Risk and Greeks**, **Portfolio Risk Guide**, **Volatility Analytics**, **GEX Guide**, and **Visualization Guide**.
 - Integrators: read **Data and Market Inputs** and **API Reference**.
 
 ## Version
 
-This documentation targets **v0.9.0**.
+This documentation targets **v1.0.0**.
 
 ## Notes
 
 - The docs assume the package import name is `crypto_bs`.
 - Market-data examples use public Deribit and CoinGecko endpoints; network failures propagate as normal `requests` or `ValueError` exceptions.
+- Visualization functions require `plotly>=5.0.0` (included in package dependencies).
 - For the change summary behind this docs set, see [../CHANGELOG.md](../CHANGELOG.md).
