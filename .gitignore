@@ -59,3 +59,6 @@ env/
 .pytype/
 
 tests/__pycache__/
+
+# Internal review / audit docs — not for public repo
+review/
