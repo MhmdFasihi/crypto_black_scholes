@@ -110,9 +110,10 @@ def test_get_btc_volatility_delegates_to_default_client(monkeypatch):
 
 
 def test_public_api_version_and_exports():
-    assert crypto_bs.__version__ == "1.0.0"
+    assert crypto_bs.__version__ == "1.1.0"
     assert hasattr(crypto_bs, "DeribitClient")
     assert hasattr(crypto_bs, "PortfolioAnalyzer")
+    assert hasattr(crypto_bs, "StrikeOutOfRangeError")
 
 
 # Advanced tests for coin-based options
@@ -292,6 +293,43 @@ def test_iv_rejects_below_intrinsic():
     intrinsic_coin = (50000 - 45000) / 50000
     with pytest.raises(ValueError, match="intrinsic"):
         bs.calculate_implied_volatility(intrinsic_coin * 0.5, params)
+
+
+# --- v1.1.0 new tests ---
+
+def test_black76_theta_identical_call_put():
+    """BUG-08: Black-76 theta is mathematically identical for calls and puts (r=0 model)."""
+    F, K, T, sig = 40000.0, 38000.0, 30 / 365, 0.8
+    t_call = theta(F, K, T, sig, "call")
+    t_put = theta(F, K, T, sig, "put")
+    assert abs(t_call - t_put) < 1e-12
+
+
+def test_adaptive_bump_deep_otm_no_error():
+    """NEW-05: second-order Greeks computed without error for deep OTM (moneyness=0.5)."""
+    greeks = calculate_option_greeks(
+        spot=50000,
+        strike=100000,  # moneyness = 0.5, deep OTM
+        time_to_maturity=30 / 365,
+        volatility=0.8,
+        option_type="call",
+        is_coin_based=True,
+    )
+    assert "gamma" in greeks
+    assert greeks["gamma"] is not None
+
+
+def test_adaptive_bump_high_vol_no_error():
+    """NEW-05: second-order Greeks computed without error at high vol (150%)."""
+    greeks = calculate_option_greeks(
+        spot=50000,
+        strike=52000,
+        time_to_maturity=30 / 365,
+        volatility=1.50,  # extreme crypto vol
+        option_type="call",
+        is_coin_based=False,
+    )
+    assert "vomma" in greeks
 
 
 def test_breakeven_coin_based():

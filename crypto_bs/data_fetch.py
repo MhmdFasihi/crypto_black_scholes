@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
+import importlib.metadata
 import time
 
 import pandas as pd
@@ -62,6 +63,7 @@ class DeribitClient:
     rate_limit_per_second: float = DEFAULT_RATE_LIMIT
     default_cache_ttl: float = DEFAULT_CACHE_TTL
     session: requests.Session | None = None
+    max_cache_size: int = 500
     _cache: dict[tuple[str, str, tuple[tuple[str, Any], ...]], tuple[float, Any]] = field(
         default_factory=dict,
         init=False,
@@ -85,7 +87,11 @@ class DeribitClient:
             adapter = HTTPAdapter(max_retries=retry)
             self.session.mount("https://", adapter)
             self.session.mount("http://", adapter)
-        self.session.headers.setdefault("User-Agent", "crypto_bs/0.9.0")
+        try:
+            _pkg_version = importlib.metadata.version("crypto-bs")
+        except importlib.metadata.PackageNotFoundError:
+            _pkg_version = "dev"
+        self.session.headers["User-Agent"] = f"crypto_bs/{_pkg_version}"
 
     def close(self) -> None:
         """Close the underlying HTTP session."""
@@ -132,6 +138,14 @@ class DeribitClient:
             raise ValueError(f"API error from {endpoint}: {payload['error']}")
 
         if cache_seconds > 0:
+            if len(self._cache) >= self.max_cache_size:
+                # Evict oldest expired entry first; fall back to FIFO eviction.
+                now = time.monotonic()
+                expired_keys = [k for k, (exp, _) in self._cache.items() if exp < now]
+                if expired_keys:
+                    del self._cache[expired_keys[0]]
+                else:
+                    del self._cache[next(iter(self._cache))]
             self._cache[cache_key] = (time.monotonic() + cache_seconds, payload)
         return payload
 

@@ -236,7 +236,7 @@ class VolatilityAnalytics:
             return "CONTANGO"
         return "FLAT"
 
-    def trading_signal(self) -> Dict[str, float | str]:
+    def regime_summary(self) -> Dict[str, float | str]:
         """
         Synthesize regime metrics into coarse directional signals.
 
@@ -255,6 +255,17 @@ class VolatilityAnalytics:
             "total_signal": total,
         }
 
+    def trading_signal(self) -> Dict[str, float | str]:
+        """Deprecated alias for :meth:`regime_summary`. Will be removed in v2.0."""
+        import warnings
+        warnings.warn(
+            "trading_signal() has been renamed to regime_summary(). "
+            "trading_signal() will be removed in v2.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.regime_summary()
+
     def summary(
         self,
         *,
@@ -269,7 +280,7 @@ class VolatilityAnalytics:
         summary: Dict[str, float | str | None] = {
             **self.term_structure_metrics(),
             **self.skew_term_metrics(),
-            **self.trading_signal(),
+            **self.regime_summary(),
         }
         summary["iv_percentile"] = (
             self.iv_percentile(lookback_days=lookback_days)

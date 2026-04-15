@@ -150,8 +150,11 @@ class GreeksCalculator:
         Returns:
             Dictionary of second-order Greeks
         """
-        eps_price = params.spot_price * 0.001  # 0.1% bump
-        eps_vol = 0.001  # 0.1% vol bump
+        # Bump sizes scale with moneyness and vol level for numerical stability.
+        # Deeper OTM options need a larger spot bump; high-vol regimes need a larger vol bump.
+        moneyness = params.spot_price / params.strike_price
+        eps_price = params.spot_price * float(np.clip(0.001 * (1.0 + abs(1.0 - moneyness)), 0.001, 0.01))
+        eps_vol = float(np.clip(params.volatility * 0.01, 0.001, 0.01))
         eps_time = 1/365  # 1 day bump
         
         second_order = {}

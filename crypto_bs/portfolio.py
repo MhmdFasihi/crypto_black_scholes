@@ -364,10 +364,15 @@ class PortfolioAnalyzer:
         n_scenarios: int = 5000,
         random_seed: int = 7,
         spot_volatility: float | None = None,
-        vol_of_vol: float = 0.25,
+        vol_of_vol: float = 0.80,
         spot_vol_correlation: float = -0.25,
     ) -> PortfolioDistribution:
-        """Estimate VaR/CVaR from full repricing under sampled spot/volatility scenarios."""
+        """Estimate VaR/CVaR from full repricing under sampled spot/volatility scenarios.
+
+        ``vol_of_vol`` defaults to 0.80 (crypto normal conditions).
+        Use 1.5–2.0 for stress scenarios. Equity default (0.25) underestimates
+        crypto tail risk by 3–8×.
+        """
         if not 0.0 < confidence < 1.0:
             raise ValueError("confidence must be between 0 and 1")
         if horizon_days <= 0:
@@ -480,7 +485,7 @@ class PortfolioAnalyzer:
         n_scenarios: int = 5000,
         random_seed: int = 7,
         spot_volatility: float | None = None,
-        vol_of_vol: float = 0.25,
+        vol_of_vol: float = 0.80,
         spot_vol_correlation: float = -0.25,
     ) -> PortfolioReport:
         """Build a combined portfolio report with base, stress, and tail-risk views."""

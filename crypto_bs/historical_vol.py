@@ -23,7 +23,7 @@ def _validate_window(window: int) -> None:
 def close_to_close_hv(
     prices: pd.Series,
     window: int = 30,
-    trading_days: int = 252,
+    trading_days: int = 365,
 ) -> pd.Series:
     """Annualized close-to-close realized volatility."""
     _validate_series("prices", prices)
@@ -36,7 +36,7 @@ def parkinson_hv(
     high: pd.Series,
     low: pd.Series,
     window: int = 30,
-    trading_days: int = 252,
+    trading_days: int = 365,
 ) -> pd.Series:
     """Annualized Parkinson volatility estimator using high/low range."""
     _validate_series("high", high)
@@ -58,7 +58,7 @@ def rogers_satchell_hv(
     low: pd.Series,
     close: pd.Series,
     window: int = 30,
-    trading_days: int = 252,
+    trading_days: int = 365,
 ) -> pd.Series:
     """Annualized Rogers-Satchell volatility estimator."""
     _validate_series("open_", open_)
@@ -85,7 +85,7 @@ def yang_zhang_hv(
     low: pd.Series,
     close: pd.Series,
     window: int = 30,
-    trading_days: int = 252,
+    trading_days: int = 365,
 ) -> pd.Series:
     """Annualized Yang-Zhang volatility estimator."""
     _validate_series("open_", open_)

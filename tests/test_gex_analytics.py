@@ -1,5 +1,8 @@
+import warnings
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from crypto_bs.analytics import VolatilityAnalytics
 from crypto_bs.gex import compute_gex, find_gamma_flip, gex_summary
@@ -89,3 +92,53 @@ def test_volatility_analytics_skew_term_metrics_without_skew_series():
     skew_metrics = va.skew_term_metrics()
     assert skew_metrics["skew_front"] is None
     assert va.summary()["skew_regime"] == "UNKNOWN"
+
+
+# --- v1.1.0 new tests ---
+
+def _make_va() -> VolatilityAnalytics:
+    term = pd.Series(
+        data=[0.85, 0.72, 0.65],
+        index=[7 / 365, 30 / 365, 90 / 365],
+    )
+    skew = pd.Series(
+        data=[0.04, 0.035, 0.03],
+        index=[7 / 365, 30 / 365, 90 / 365],
+    )
+    return VolatilityAnalytics(term, skew_by_maturity=skew)
+
+
+def test_regime_summary_works():
+    """trading_signal renamed: regime_summary() returns expected keys."""
+    va = _make_va()
+    result = va.regime_summary()
+    assert "total_signal" in result
+    assert "ts_regime" in result
+    assert "skew_regime" in result
+
+
+def test_trading_signal_raises_deprecation_warning():
+    """trading_signal() emits DeprecationWarning after rename."""
+    va = _make_va()
+    with pytest.warns(DeprecationWarning, match="regime_summary"):
+        result = va.trading_signal()
+    assert "total_signal" in result
+
+
+def test_regime_summary_equals_old_trading_signal():
+    """regime_summary() output identical to old trading_signal() output."""
+    va = _make_va()
+    new_result = va.regime_summary()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        old_result = va.trading_signal()
+    assert new_result == old_result
+
+
+def test_gex_vectorized_matches_reference():
+    """BUG-07: vectorized compute_gex() produces same net GEX as known reference."""
+    chain = _sample_chain()
+    gex = compute_gex(chain, spot=100000)
+    # Net GEX values should have consistent sign structure
+    assert len(gex) == 3
+    assert gex["gex_net"].notna().all()

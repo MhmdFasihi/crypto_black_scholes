@@ -1,7 +1,8 @@
+import pytest
 import pandas as pd
 
 from crypto_bs.analytics import VolatilityAnalytics
-from crypto_bs.surface import VolatilitySurface
+from crypto_bs.surface import VolatilitySurface, StrikeOutOfRangeError
 
 
 def _chain() -> pd.DataFrame:
@@ -97,3 +98,50 @@ def test_surface_describe_surface_handles_requested_interpolated_maturity():
     assert row["time_to_maturity"] == 14 / 365
     assert row["nearest_fitted_maturity"] == 7 / 365
     assert row["atm_iv"] > 0
+
+
+# --- v1.1.0 new tests ---
+
+def test_strike_out_of_range_raises_below_min():
+    """NEW-07: _interp_strike raises StrikeOutOfRangeError for strike below range."""
+    s = VolatilitySurface()
+    s.fit(_chain())
+    t = 30 / 365
+    with pytest.raises(StrikeOutOfRangeError):
+        s._interp_strike(t, 50000.0)  # well below 85 000
+
+
+def test_strike_out_of_range_raises_above_max():
+    """NEW-07: _interp_strike raises StrikeOutOfRangeError for strike above range."""
+    s = VolatilitySurface()
+    s.fit(_chain())
+    t = 30 / 365
+    with pytest.raises(StrikeOutOfRangeError):
+        s._interp_strike(t, 200000.0)  # well above 115 000
+
+
+def test_strike_out_of_range_get_iv_propagates():
+    """NEW-07: get_iv propagates StrikeOutOfRangeError."""
+    s = VolatilitySurface()
+    s.fit(_chain())
+    with pytest.raises(StrikeOutOfRangeError):
+        s.get_iv(50000.0, 30 / 365)
+
+
+def test_strike_within_range_does_not_raise():
+    """NEW-07: strike inside quoted range returns a valid IV without error."""
+    s = VolatilitySurface()
+    s.fit(_chain())
+    iv = s.get_iv(100000.0, 30 / 365)
+    assert 0.0 < iv < 5.0
+
+
+def test_delta_metrics_returns_nearest_fitted_maturity():
+    """BUG-03: _delta_metrics return dict contains nearest_fitted_maturity key."""
+    s = VolatilitySurface()
+    s.fit(_chain())
+    result = s._delta_metrics(14 / 365, delta=0.25)
+    assert result is not None
+    assert "nearest_fitted_maturity" in result
+    # Nearest fitted maturity to 14/365 is 7/365
+    assert result["nearest_fitted_maturity"] == pytest.approx(7 / 365, abs=1e-9)

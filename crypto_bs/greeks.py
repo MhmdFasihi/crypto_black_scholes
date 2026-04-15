@@ -54,6 +54,8 @@ def vega(F: float, K: float, T: float, sigma: float) -> float:
 def theta(F: float, K: float, T: float, sigma: float, option_type: str) -> float:
     d1 = calculate_d1(F, K, T, sigma)
     T_eff = max(T, _MIN_T)
+    # Black-76 theta is identical for calls and puts when r=0 (no discounting term).
+    # With r=0 the cost-of-carry term vanishes, leaving only the diffusion decay.
     if option_type.lower() == 'call':
         return float(-(F * sigma * norm.pdf(d1)) / (2 * np.sqrt(T_eff)))
     if option_type.lower() == 'put':

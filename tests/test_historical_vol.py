@@ -57,3 +57,38 @@ def test_invalid_window_raises():
     _, _, _, close = _sample_ohlc()
     with pytest.raises(ValueError):
         close_to_close_hv(close, window=1)
+
+
+# --- v1.1.0 new tests ---
+
+def test_close_to_close_default_trading_days_is_365():
+    """Config fix: close_to_close_hv default trading_days changed from 252 to 365."""
+    import inspect
+    sig = inspect.signature(close_to_close_hv)
+    assert sig.parameters["trading_days"].default == 365
+
+
+def test_parkinson_default_trading_days_is_365():
+    import inspect
+    sig = inspect.signature(parkinson_hv)
+    assert sig.parameters["trading_days"].default == 365
+
+
+def test_rogers_satchell_default_trading_days_is_365():
+    import inspect
+    sig = inspect.signature(rogers_satchell_hv)
+    assert sig.parameters["trading_days"].default == 365
+
+
+def test_yang_zhang_default_trading_days_is_365():
+    import inspect
+    sig = inspect.signature(yang_zhang_hv)
+    assert sig.parameters["trading_days"].default == 365
+
+
+def test_trading_days_365_gives_higher_vol_than_252():
+    """Annualizing with 365 trading days gives higher vol than 252."""
+    _, _, _, close = _sample_ohlc()
+    hv_365 = close_to_close_hv(close, window=20, trading_days=365).dropna()
+    hv_252 = close_to_close_hv(close, window=20, trading_days=252).dropna()
+    assert (hv_365 > hv_252).all()

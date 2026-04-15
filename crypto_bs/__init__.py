@@ -28,7 +28,7 @@ from .portfolio import (
     build_portfolio_report,
     stress_test_portfolio,
 )
-from .surface import VolatilitySurface
+from .surface import VolatilitySurface, StrikeOutOfRangeError
 from .visualization import (
     plot_volatility_surface,
     plot_smile_slice,
@@ -57,7 +57,7 @@ __all__ = [
     'close_to_close_hv', 'parkinson_hv', 'rogers_satchell_hv', 'yang_zhang_hv',
     'vol_premium',
     'compute_gex', 'find_gamma_flip', 'gex_summary', 'VolatilityAnalytics',
-    'VolatilitySurface', 'DeribitClient',
+    'VolatilitySurface', 'StrikeOutOfRangeError', 'DeribitClient',
     'plot_volatility_surface', 'plot_smile_slice', 'plot_term_structure', 'plot_gex',
 
     # Advanced classes
@@ -73,4 +73,4 @@ __all__ = [
 ]
 
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

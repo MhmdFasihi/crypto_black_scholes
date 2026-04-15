@@ -190,3 +190,43 @@ def test_get_btc_volatility_from_history_returns_positive_value(monkeypatch):
     hv = client.get_btc_volatility(days=20, window=10, trading_days=365)
 
     assert hv > 0
+
+
+# --- v1.1.0 new tests ---
+
+def test_cache_does_not_exceed_max_size(monkeypatch):
+    """NEW-04: cache evicts entries before exceeding max_cache_size."""
+    client = DeribitClient(rate_limit_per_second=0, max_cache_size=3)
+    call_count = 0
+
+    def fake_get(url, params=None, timeout=10):
+        nonlocal call_count
+        call_count += 1
+
+        class FakeResp:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self): return {"result": call_count}
+
+        return FakeResp()
+
+    monkeypatch.setattr(client.session, "get", fake_get)
+
+    # Fill cache beyond max_cache_size
+    for i in range(10):
+        client._request_json(
+            base_url="https://test.example/",
+            endpoint=f"ep_{i}",
+            params={"q": i},
+            cache_ttl=60.0,
+        )
+
+    assert len(client._cache) <= client.max_cache_size
+
+
+def test_user_agent_is_not_hardcoded():
+    """NEW-02: User-Agent header does not contain the old hardcoded version string."""
+    client = DeribitClient(rate_limit_per_second=0)
+    ua = client.session.headers.get("User-Agent", "")
+    assert "crypto_bs/" in ua
+    assert "0.9.0" not in ua

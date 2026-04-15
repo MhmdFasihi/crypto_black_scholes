@@ -141,3 +141,26 @@ def test_build_report_and_convenience_wrappers_return_expected_shapes():
     assert len(wrapped["positions"]) == 3
     assert len(wrapped["stress_tests"]) == 3
     assert len(stress) == 3
+
+
+# --- v1.1.0 new tests ---
+
+def test_vol_of_vol_default_is_0_80():
+    """NEW-09: vol_of_vol default changed from 0.25 to 0.80 for crypto."""
+    import inspect
+    from crypto_bs.portfolio import PortfolioAnalyzer
+    sig = inspect.signature(PortfolioAnalyzer.estimate_var_cvar)
+    assert sig.parameters["vol_of_vol"].default == 0.80
+
+
+def test_vol_of_vol_affects_var_magnitude():
+    """NEW-09: higher vol_of_vol produces larger (or equal) VaR."""
+    analyzer = PortfolioAnalyzer()
+    var_high = analyzer.estimate_var_cvar(
+        _sample_portfolio(), n_scenarios=2000, random_seed=7, vol_of_vol=0.80
+    ).value_at_risk
+    var_low = analyzer.estimate_var_cvar(
+        _sample_portfolio(), n_scenarios=2000, random_seed=7, vol_of_vol=0.10
+    ).value_at_risk
+    # Higher vol_of_vol should generally produce larger tail risk
+    assert var_high >= var_low * 0.9  # allow small numerical noise

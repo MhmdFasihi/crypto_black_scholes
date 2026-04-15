@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
@@ -9,6 +10,15 @@ import numpy as np
 import pandas as pd
 
 from .black_scholes import BlackScholesModel, OptionParameters, OptionType
+
+
+class StrikeOutOfRangeError(ValueError):
+    """Strike is outside the fitted surface's quoted strike range.
+
+    Raised instead of silently flat-extrapolating to prevent consumers from
+    acting on IV values that are purely an artefact of boundary extension.
+    """
+    pass
 
 
 @dataclass
@@ -104,6 +114,12 @@ class VolatilitySurface:
         g = self._by_t[t]
         x = g["strike"].to_numpy(dtype=float)
         y = g["implied_volatility"].to_numpy(dtype=float)
+        if len(x) > 1 and (strike < x.min() or strike > x.max()):
+            raise StrikeOutOfRangeError(
+                f"Strike {strike:.4f} is outside the fitted range "
+                f"[{x.min():.4f}, {x.max():.4f}] for T={t:.6f}. "
+                "Use a strike within the quoted range or extrapolate explicitly."
+            )
         return float(np.interp(strike, x, y))
 
     def _nearest_time(self, time_to_maturity: float) -> float:
@@ -290,7 +306,10 @@ class VolatilitySurface:
             return None
 
         bs_model = BlackScholesModel()
-        result: dict[str, float] = {"atm_iv": self.get_atm_iv(time_to_maturity)}
+        result: dict[str, float] = {
+            "atm_iv": self.get_atm_iv(time_to_maturity),
+            "nearest_fitted_maturity": nearest_t,
+        }
         for option_type, target_delta in (("call", delta), ("put", -delta)):
             subset = frame[frame["option_type"] == option_type]
             if subset.empty:

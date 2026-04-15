@@ -52,11 +52,12 @@ def compute_gex(
         raise ValueError("dealer_convention must be 'short_gamma' or 'long_gamma'")
 
     bs = BlackScholesModel()
-    rows = []
-    for _, row in chain_df.iterrows():
+    opt_types = chain_df["option_type"].str.lower()
+    if not opt_types.isin({"call", "put"}).all():
+        raise ValueError("option_type must be call or put")
+
+    def _row_gex(row: pd.Series) -> tuple[float, float, float]:
         opt = str(row["option_type"]).lower()
-        if opt not in {"call", "put"}:
-            raise ValueError("option_type must be call or put")
         params = OptionParameters(
             spot_price=float(row.get("spot_price", spot)),
             strike_price=float(row["strike"]),
@@ -66,26 +67,24 @@ def compute_gex(
             option_type=OptionType.CALL if opt == "call" else OptionType.PUT,
             is_coin_based=bool(row.get("is_coin_based", False)),
         )
-        gamma = bs.calculate_option_price(params).gamma
+        gma = bs.calculate_option_price(params).gamma
         oi = float(row["open_interest"])
-
         if dealer_convention == "short_gamma":
             sign = 1.0 if opt == "call" else -1.0
         else:
             sign = -1.0 if opt == "call" else 1.0
+        return gma, oi, sign * oi * gma * (spot**2) * contract_size
 
-        gex = sign * oi * gamma * (spot**2) * contract_size
-        rows.append(
-            {
-                "strike": float(row["strike"]),
-                "option_type": opt,
-                "open_interest": oi,
-                "gamma": gamma,
-                "gex": gex,
-            }
-        )
-
-    details = pd.DataFrame(rows)
+    results = chain_df.apply(_row_gex, axis=1)
+    details = pd.DataFrame(
+        {
+            "strike": chain_df["strike"].astype(float).values,
+            "option_type": opt_types.values,
+            "open_interest": chain_df["open_interest"].astype(float).values,
+            "gamma": [r[0] for r in results],
+            "gex": [r[2] for r in results],
+        }
+    )
     grouped = (
         details.groupby(["strike", "option_type"], as_index=False)["gex"]
         .sum()
