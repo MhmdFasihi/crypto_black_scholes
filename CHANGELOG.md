@@ -1,6 +1,62 @@
 
 # Changelog
 
+## [1.2.0] — 2026-04-27
+
+### Added
+
+- **`crypto_bs.utils.CryptoVolConfig`** — central configuration dataclass with crypto-appropriate defaults:
+  - `trading_days=365` (crypto 24/7/365 vs equity 252)
+  - `vol_of_vol=0.80` (BTC normal-conditions default)
+  - `spot_vol_correlation=-0.20`
+  - `default_risk_free_rate=0.0`
+  - `min_time_to_maturity=1/8760` (1 hour floor)
+  - Exported from `crypto_bs` top-level.
+- **Structured logging** — all modules now use `logging.getLogger(__name__)`. Key events logged at DEBUG (cache hits/misses, HTTP requests) and INFO (surface fit summary, VaR/CVaR result). No stdout side effects; callers configure handlers as needed.
+- **`cachetools`** added as a package dependency (`>=5.0.0`).
+
+### Changed
+
+- **Thread-safe bounded cache** (`data_fetch.py`) — `DeribitClient._cache` migrated from a plain `dict` with manual eviction to `cachetools.TTLCache(maxsize, ttl)`. TTLCache provides automatic LRU eviction at `max_cache_size` and TTL-based expiry, with all reads/writes wrapped under the existing `threading.Lock` for safe concurrent use.
+- **Type annotations** — `utils.py` public functions (`breakeven_price`, `breakeven_price_coin_based`) now carry full `float`/`str` return type annotations.
+- **CI coverage gate** — GitHub Actions test job now runs `pytest --cov=crypto_bs --cov-fail-under=80`, failing the build if line coverage drops below 80%.
+- Package version bumped to `1.2.0`.
+
+### Fixed
+
+- **BUG-07 verification hardening:** `compute_gex()` is now genuinely vectorized with NumPy arrays for d1, gamma, sign, and GEX computation, while matching the previous scalar `BlackScholesModel` reference output.
+- **Default rate cleanup:** public helper/default paths no longer reintroduce `risk_free_rate=0.05`; crypto defaults are consistently `0.0` unless explicitly provided.
+- **BUG-03 fallback path:** `get_smile_metrics()` now includes `nearest_fitted_maturity` for both delta-aware metrics and strike-quantile fallback metrics.
+- **License header audit:** remaining source headers now match the repository MIT license.
+
+---
+
+## [1.1.0] — 2026-04-20
+
+### Fixed
+
+- **NEW-07 (CRITICAL):** `VolatilitySurface._interp_strike()` previously silently flat-extrapolated via `np.interp` when a strike fell outside the fitted range. Now raises `StrikeOutOfRangeError` (a `ValueError` subclass) with the violated range in the message, preventing consumers from acting on boundary-clamped IV values.
+- **NEW-09 (HIGH):** `PortfolioAnalyzer.estimate_var_cvar()` default `vol_of_vol` changed from `0.25` (TradFi equity) to `0.80` (BTC normal conditions). The equity default underestimated crypto tail risk by 3–8×.
+- **BUG-03 (MEDIUM):** `VolatilitySurface._delta_metrics()` now includes `"nearest_fitted_maturity"` in its return dict, making explicit which maturity was used for computation (nearest available vs. requested).
+- **BUG-07 (LOW):** `compute_gex()` in `gex.py` replaced the scalar `iterrows()` loop with vectorized NumPy gamma and GEX calculations for large chains (2000+ instruments).
+- **NEW-02 (LOW):** `DeribitClient` User-Agent no longer hardcoded as `"crypto_bs/0.9.0"`. Now set dynamically via `importlib.metadata.version("crypto-bs")` with `"dev"` fallback.
+- **NEW-04 (LOW):** `DeribitClient._cache` now bounded at `max_cache_size` (default 500) with expired-first eviction, preventing unbounded memory growth in long-running processes.
+- **NEW-05 (LOW):** `GreeksCalculator` second-order Greeks use adaptive bump sizes scaled by moneyness (`0.1%–1%` of spot) and current vol level (`1%` of vol, clamped to `[0.1%, 1%]`).
+- **BUG-08 (INFO):** Added comment to `theta()` in `greeks.py` explaining why call and put branches produce identical results in the Black-76 model (r=0 eliminates the discounting term).
+- **Config defaults:** All four HV estimators (`close_to_close_hv`, `parkinson_hv`, `rogers_satchell_hv`, `yang_zhang_hv`) now default to `trading_days=365` (crypto 24/7/365), up from 252 (equity convention).
+
+### Added
+
+- `StrikeOutOfRangeError` custom exception exported from `crypto_bs` top-level.
+- `VolatilityAnalytics.regime_summary()` — renamed replacement for `trading_signal()`.
+- `VolatilityAnalytics.trading_signal()` kept as deprecated alias emitting `DeprecationWarning`; will be removed in v2.0.
+
+### Changed
+
+- Package version bumped to `1.1.0`.
+
+---
+
 All notable changes to **crypto_bs** are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.0] — 2026-04-12

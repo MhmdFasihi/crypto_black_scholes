@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from scipy.stats import norm
+import inspect
 
 import crypto_bs.data_fetch as data_fetch
 import crypto_bs
@@ -110,10 +111,22 @@ def test_get_btc_volatility_delegates_to_default_client(monkeypatch):
 
 
 def test_public_api_version_and_exports():
-    assert crypto_bs.__version__ == "1.1.0"
+    assert crypto_bs.__version__ == "1.2.0"
     assert hasattr(crypto_bs, "DeribitClient")
     assert hasattr(crypto_bs, "PortfolioAnalyzer")
     assert hasattr(crypto_bs, "StrikeOutOfRangeError")
+
+
+def test_public_pricing_defaults_use_crypto_zero_rate():
+    """v1.2 verification: public pricing defaults no longer imply r=5%."""
+    assert OptionParameters(
+        spot_price=50000,
+        strike_price=52000,
+        time_to_maturity=30 / 365,
+        volatility=0.8,
+    ).risk_free_rate == 0.0
+    sig = inspect.signature(price_coin_based_option)
+    assert sig.parameters["risk_free_rate"].default == 0.0
 
 
 # Advanced tests for coin-based options

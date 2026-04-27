@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def _validate_series(name: str, values: pd.Series) -> None:

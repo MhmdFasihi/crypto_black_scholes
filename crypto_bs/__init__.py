@@ -1,6 +1,6 @@
 from .pricing import price_option, price_options_vectorized
 from .greeks import delta, gamma, vega, theta, rho
-from .utils import breakeven_price, breakeven_price_coin_based
+from .utils import breakeven_price, breakeven_price_coin_based, CryptoVolConfig
 from .data_fetch import (
     DeribitClient,
     get_available_instruments,
@@ -52,6 +52,7 @@ __all__ = [
     'price_option', 'price_options_vectorized', 'delta', 'gamma', 'vega', 'theta', 'rho',
     'breakeven_price',
     'breakeven_price_coin_based',
+    'CryptoVolConfig',
     'get_btc_forward_price', 'get_option_data', 'get_available_instruments',
     'get_btc_price', 'get_btc_volatility', 'get_full_chain', 'get_iv_surface_data',
     'close_to_close_hv', 'parkinson_hv', 'rogers_satchell_hv', 'yang_zhang_hv',
@@ -73,4 +74,4 @@ __all__ = [
 ]
 
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from .black_scholes import BlackScholesModel, OptionParameters, OptionType
 from .greeks_calculator import GreeksCalculator
@@ -53,7 +56,7 @@ class PortfolioPosition:
             option_type=option_type,
             underlying=str(data.get("underlying", "UNKNOWN")).upper(),
             is_coin_based=bool(data.get("is_coin_based", False)),
-            risk_free_rate=float(data.get("risk_free_rate", 0.05)),
+            risk_free_rate=float(data.get("risk_free_rate", 0.0)),
             dividend_yield=float(data.get("dividend_yield", 0.0)),
             label=None if data.get("label") is None else str(data["label"]),
         )
@@ -195,7 +198,9 @@ class PortfolioAnalyzer:
                 usd_price = max(shocked_spot - position.strike_price, 0.0)
             else:
                 usd_price = max(position.strike_price - shocked_spot, 0.0)
-            option_value = usd_price / shocked_spot if position.is_coin_based else usd_price
+            option_value: float | None = (
+                usd_price / shocked_spot if position.is_coin_based else usd_price
+            )
         else:
             pricing = self.bs_model.calculate_option_price(
                 self._to_option_parameters(
@@ -373,6 +378,10 @@ class PortfolioAnalyzer:
         Use 1.5–2.0 for stress scenarios. Equity default (0.25) underestimates
         crypto tail risk by 3–8×.
         """
+        logger.debug(
+            "estimate_var_cvar: confidence=%.2f horizon_days=%d n_scenarios=%d vol_of_vol=%.2f",
+            confidence, horizon_days, n_scenarios, vol_of_vol,
+        )
         if not 0.0 < confidence < 1.0:
             raise ValueError("confidence must be between 0 and 1")
         if horizon_days <= 0:
@@ -459,6 +468,11 @@ class PortfolioAnalyzer:
         conditional_value_at_risk = max(
             0.0,
             -float(tail.mean()) if tail.size else -cutoff,
+        )
+        logger.info(
+            "VaR/CVaR: VaR=%.6f CVaR=%.6f (confidence=%.0f%% horizon=%dd n=%d)",
+            value_at_risk, conditional_value_at_risk,
+            confidence * 100, horizon_days, n_scenarios,
         )
         return PortfolioDistribution(
             confidence=confidence,

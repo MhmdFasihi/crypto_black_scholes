@@ -44,7 +44,7 @@ class OptionParameters:
     strike_price: float
     time_to_maturity: float  # In years
     volatility: float  # Annualized
-    risk_free_rate: float = 0.05
+    risk_free_rate: float = 0.0
     dividend_yield: float = 0.0  # For crypto, this could be staking yield
     option_type: Union[OptionType, str] = OptionType.CALL
     pricing_model: PricingModel = PricingModel.BLACK_SCHOLES
@@ -351,7 +351,7 @@ class Black76Model(BlackScholesModel):
 # Utility functions for quick calculations
 def price_coin_based_option(spot: float, strike: float, time_to_maturity: float,
                            volatility: float, option_type: str = 'call',
-                           risk_free_rate: float = 0.05) -> Dict[str, float]:
+                           risk_free_rate: float = 0.0) -> Dict[str, float]:
     """
     Quick pricing function for coin-based options.
     
@@ -370,6 +370,8 @@ def price_coin_based_option(spot: float, strike: float, time_to_maturity: float,
     )
     
     result = bs_model.calculate_option_price(params)
+    if result.coin_based_price is None or result.usd_price is None:
+        raise ValueError("Could not compute coin-based option price")
     
     return {
         'coin_price': result.coin_based_price,
@@ -406,7 +408,7 @@ def validate_deribit_pricing(deribit_price_btc: float, spot: float, strike: floa
         strike_price=strike,
         time_to_maturity=time_to_maturity,
         volatility=0.8,  # Initial guess
-        risk_free_rate=0.05,
+        risk_free_rate=0.0,
         option_type=OptionType.CALL if option_type.lower() == 'call' else OptionType.PUT,
         is_coin_based=True
     )
@@ -417,6 +419,8 @@ def validate_deribit_pricing(deribit_price_btc: float, spot: float, strike: floa
     # Calculate theoretical price with this IV
     params.volatility = iv
     theoretical = bs_model.calculate_option_price(params)
+    if theoretical.coin_based_price is None or theoretical.usd_price is None:
+        raise ValueError("Could not compute theoretical Deribit price")
     
     return {
         'implied_volatility': iv,

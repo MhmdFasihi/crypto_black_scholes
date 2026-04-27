@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from crypto_bs.analytics import VolatilityAnalytics
+from crypto_bs.black_scholes import BlackScholesModel, OptionParameters, OptionType
 from crypto_bs.gex import compute_gex, find_gamma_flip, gex_summary
 
 
@@ -136,9 +137,62 @@ def test_regime_summary_equals_old_trading_signal():
 
 
 def test_gex_vectorized_matches_reference():
-    """BUG-07: vectorized compute_gex() produces same net GEX as known reference."""
+    """BUG-07: vectorized compute_gex() produces finite net GEX values."""
     chain = _sample_chain()
     gex = compute_gex(chain, spot=100000)
     # Net GEX values should have consistent sign structure
     assert len(gex) == 3
     assert gex["gex_net"].notna().all()
+
+
+def test_gex_vectorized_matches_scalar_black_scholes_reference():
+    """BUG-07: vectorized compute_gex() matches the old scalar pricing reference."""
+    chain = _sample_chain().copy()
+    chain["spot_price"] = 100000.0
+    chain["risk_free_rate"] = 0.0
+    chain["dividend_yield"] = 0.0
+    chain["is_coin_based"] = False
+    spot = 100000.0
+    contract_size = 2.5
+
+    actual = compute_gex(chain, spot=spot, contract_size=contract_size)
+
+    bs = BlackScholesModel()
+    rows = []
+    for _, row in chain.iterrows():
+        params = OptionParameters(
+            spot_price=float(row["spot_price"]),
+            strike_price=float(row["strike"]),
+            time_to_maturity=float(row["time_to_maturity"]),
+            volatility=float(row["volatility"]),
+            risk_free_rate=float(row["risk_free_rate"]),
+            dividend_yield=float(row["dividend_yield"]),
+            option_type=OptionType.CALL if row["option_type"] == "call" else OptionType.PUT,
+            is_coin_based=False,
+        )
+        gamma = bs.calculate_option_price(params).gamma
+        sign = 1.0 if row["option_type"] == "call" else -1.0
+        rows.append(
+            {
+                "strike": float(row["strike"]),
+                "option_type": row["option_type"],
+                "gex": sign * float(row["open_interest"]) * gamma * spot**2 * contract_size,
+            }
+        )
+    expected = (
+        pd.DataFrame(rows)
+        .groupby(["strike", "option_type"], as_index=False)["gex"]
+        .sum()
+        .pivot(index="strike", columns="option_type", values="gex")
+        .fillna(0.0)
+        .rename(columns={"call": "gex_call", "put": "gex_put"})
+        .reset_index()
+        .sort_values("strike")
+    )
+    expected["gex_net"] = expected["gex_call"] + expected["gex_put"]
+    expected["cumulative_gex"] = expected["gex_net"].cumsum()
+
+    assert np.allclose(actual["gex_call"], expected["gex_call"])
+    assert np.allclose(actual["gex_put"], expected["gex_put"])
+    assert np.allclose(actual["gex_net"], expected["gex_net"])
+    assert np.allclose(actual["cumulative_gex"], expected["cumulative_gex"])

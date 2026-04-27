@@ -145,3 +145,12 @@ def test_delta_metrics_returns_nearest_fitted_maturity():
     assert "nearest_fitted_maturity" in result
     # Nearest fitted maturity to 14/365 is 7/365
     assert result["nearest_fitted_maturity"] == pytest.approx(7 / 365, abs=1e-9)
+
+
+def test_get_smile_metrics_fallback_returns_nearest_fitted_maturity():
+    """BUG-03: fallback get_smile_metrics also exposes the fitted maturity used."""
+    s = VolatilitySurface()
+    s.fit(_chain()[["strike", "time_to_maturity", "implied_volatility"]])
+    result = s.get_smile_metrics(14 / 365, delta=0.25)
+    assert "nearest_fitted_maturity" in result
+    assert result["nearest_fitted_maturity"] == pytest.approx(7 / 365, abs=1e-9)

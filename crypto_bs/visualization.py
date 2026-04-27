@@ -19,7 +19,7 @@ Example::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, overload
 
 import numpy as np
 import pandas as pd
@@ -53,6 +53,16 @@ _PUT_COLOR = "#e63946"
 _NET_COLOR = "#f4a261"
 _SPOT_COLOR = "#2dc653"
 _FLIP_COLOR = "#e63946"
+
+
+@overload
+def _iv_to_pct(iv: float) -> float:
+    ...
+
+
+@overload
+def _iv_to_pct(iv: np.ndarray) -> np.ndarray:
+    ...
 
 
 def _iv_to_pct(iv: float | np.ndarray) -> float | np.ndarray:
@@ -276,7 +286,9 @@ def plot_term_structure(
 
     if has_skew:
         fig.add_trace(atm_trace, secondary_y=False)
-        skew_series = analytics.skew_by_maturity  # type: ignore[union-attr]
+        assert analytics is not None
+        skew_series = analytics.skew_by_maturity
+        assert skew_series is not None
         skew_dte = [round(t * 365, 1) for t in skew_series.index]
         skew_vals = _iv_to_pct(skew_series.values.astype(float)).tolist()
         fig.add_trace(

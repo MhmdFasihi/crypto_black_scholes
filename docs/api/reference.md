@@ -72,9 +72,21 @@ This page groups the public API by workflow rather than mirroring the package fi
 
 All visualization functions return `plotly.graph_objects.Figure`. No `.show()` is called inside the library. See the [Visualization Guide](../guides/visualization.md) for full parameter reference.
 
+## Configuration (new in v1.2)
+
+- `CryptoVolConfig` — dataclass at `crypto_bs.CryptoVolConfig` with crypto-appropriate defaults:
+  - `trading_days=365`, `vol_of_vol=0.80`, `spot_vol_correlation=-0.20`,
+    `default_risk_free_rate=0.0`, `min_time_to_maturity=1/8760`.
+
+## Exceptions
+
+- `StrikeOutOfRangeError` — raised by `VolatilitySurface` when a queried strike falls outside the fitted strike range. Subclass of `ValueError`.
+
 ## Notes
 
 - Time-to-maturity is expressed in years.
 - Volatility inputs are decimal annualized values.
 - `PortfolioPosition.risk_free_rate` defaults to `0.0` (coin-settled crypto assumption). Override explicitly if needed.
+- All HV estimators default to `trading_days=365` (crypto 24/7/365). Pass `trading_days=252` for equity convention.
+- `VolatilityAnalytics.trading_signal()` is deprecated; use `regime_summary()`.
 - For precise signatures and defaults, use the source docstrings in `crypto_bs/`.

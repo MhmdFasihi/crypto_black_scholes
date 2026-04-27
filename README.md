@@ -1,6 +1,6 @@
 # Crypto Black-Scholes
 
-**Version 1.0.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, an implied-volatility surface layer with smile analytics, and **interactive Plotly visualizations**.
+**Version 1.2.0** — Python library for pricing **coin-settled** cryptocurrency options with Black-76 and Black-Scholes-style models, Greeks, portfolio aggregation, portfolio reporting, Deribit-oriented helpers, historical volatility estimators, GEX/vol-regime analytics, an implied-volatility surface layer with smile analytics, and **interactive Plotly visualizations**.
 
 See **[CHANGELOG.md](CHANGELOG.md)** for release notes and breaking changes.
 See **[docs/README.md](docs/README.md)** for the local documentation index.
@@ -39,7 +39,7 @@ Import as:
 import crypto_bs
 ```
 
-Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests`, `plotly` (see `pyproject.toml`).
+Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests`, `plotly`, `cachetools` (see `pyproject.toml`).
 
 ## Documentation
 
@@ -50,6 +50,16 @@ Requires Python ≥3.10, `numpy`, `scipy`, `pandas`, `requests`, `plotly` (see `
 - [Volatility surface guide](docs/guides/volatility-surface.md)
 - [Visualization guide](docs/guides/visualization.md)
 - [Cookbook](docs/tutorials/cookbook.md)
+
+## Upgrading from 1.1.x → 1.2.0
+
+- **`cachetools`** is now a required dependency — `pip install -U crypto-bs` handles this automatically.
+- `VolatilityAnalytics.trading_signal()` now emits `DeprecationWarning`; use `regime_summary()` instead.
+- `VolatilitySurface.get_iv()` raises `StrikeOutOfRangeError` when the requested strike falls outside the fitted range — previously silently extrapolated. Catch the exception or clip strikes to the fitted range.
+- All HV estimators default to `trading_days=365` (was 252). Pass `trading_days=252` explicitly to restore the old annualization.
+- `estimate_var_cvar()` default `vol_of_vol` is `0.80` (was `0.25`). Tail-risk estimates will be larger for the same inputs — this is intentional and correct for crypto.
+- **Logging** is now emitted from each module. Add a handler if you want to see it: `logging.basicConfig(level=logging.DEBUG)`. No output change if you don't add a handler.
+- New: `CryptoVolConfig` dataclass at `crypto_bs.CryptoVolConfig` — use to centralise default parameter configuration.
 
 ## Upgrading from 0.x
 
@@ -293,6 +303,8 @@ All functions accept `template` (default `"plotly_dark"`) and `title` kwargs. No
 | `plot_smile_slice` | 2-D smile curves per maturity (Plotly) |
 | `plot_term_structure` | ATM IV term structure with optional skew overlay (Plotly) |
 | `plot_gex` | GEX bar chart by strike (Plotly) |
+| `CryptoVolConfig` | Central config dataclass with crypto-appropriate defaults |
+| `StrikeOutOfRangeError` | Raised by `VolatilitySurface` when strike is outside fitted range |
 
 Full signatures and defaults are in the source docstrings.
 

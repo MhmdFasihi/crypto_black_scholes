@@ -1,6 +1,6 @@
 [project]
 name = "crypto_bs"
-version = "1.0.0"
+version = "1.2.0"
 description = "Python library for pricing coin-settled crypto options"
 authors = [{name = "Seyed Mohammad Hossein Fasihi", email = "mhmd.fasihi@gmail.com"}]
 requires-python = ">=3.10"
@@ -24,7 +24,8 @@ dependencies = [
     "scipy>=1.7.0",
     "requests>=2.25.0",
     "pandas>=1.3.0",
-    "plotly>=5.0.0"
+    "plotly>=5.0.0",
+    "cachetools>=5.0.0"
 ]
 
 [project.urls]
@@ -46,3 +47,19 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "cachetools",
+    "cachetools.*",
+    "pandas",
+    "pandas.*",
+    "plotly",
+    "plotly.*",
+    "scipy",
+    "scipy.*",
+]
+ignore_missing_imports = true

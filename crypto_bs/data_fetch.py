@@ -7,7 +7,11 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
 import importlib.metadata
+import logging
 import time
+
+import cachetools
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 import requests
@@ -64,15 +68,20 @@ class DeribitClient:
     default_cache_ttl: float = DEFAULT_CACHE_TTL
     session: requests.Session | None = None
     max_cache_size: int = 500
-    _cache: dict[tuple[str, str, tuple[tuple[str, Any], ...]], tuple[float, Any]] = field(
-        default_factory=dict,
-        init=False,
-        repr=False,
-    )
+    # _cache is initialized in __post_init__ after default_cache_ttl is known.
+    # Type annotation kept for introspection; actual value is cachetools.TTLCache.
+    _cache: Any = field(default=None, init=False, repr=False)
     _last_request_time: float = field(default=0.0, init=False, repr=False)
     _lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        # Thread-safe TTL cache: maxsize enforces bounded memory; ttl is the
+        # default per-entry expiry. Per-call TTL overrides are respected by
+        # an explicit expiry check in _request_json.
+        self._cache = cachetools.TTLCache(
+            maxsize=self.max_cache_size,
+            ttl=max(self.default_cache_ttl, 1.0),
+        )
         if self.session is None:
             self.session = requests.Session()
             retry = Retry(
@@ -120,11 +129,18 @@ class DeribitClient:
         normalized_params = tuple(sorted((params or {}).items()))
         cache_seconds = self.default_cache_ttl if cache_ttl is None else cache_ttl
         cache_key = (base_url, endpoint, normalized_params)
-        if cache_seconds > 0:
-            cached = self._cache.get(cache_key)
-            if cached and cached[0] >= time.monotonic():
-                return cached[1]
 
+        # Check cache under lock for thread safety.
+        if cache_seconds > 0:
+            with self._lock:
+                cached = self._cache.get(cache_key)
+            if cached is not None:
+                expiry, payload = cached
+                if expiry >= time.monotonic():
+                    logger.debug("cache hit: %s %s", endpoint, normalized_params)
+                    return payload  # type: ignore[return-value]
+
+        logger.debug("HTTP GET %s%s params=%s", base_url, endpoint, normalized_params)
         self._rate_limit()
         response = self.session.get(  # type: ignore[union-attr]
             f"{base_url}{endpoint}",
@@ -135,18 +151,14 @@ class DeribitClient:
         payload = response.json()
 
         if isinstance(payload, dict) and payload.get("error"):
+            logger.warning("API error from %s: %s", endpoint, payload["error"])
             raise ValueError(f"API error from {endpoint}: {payload['error']}")
 
         if cache_seconds > 0:
-            if len(self._cache) >= self.max_cache_size:
-                # Evict oldest expired entry first; fall back to FIFO eviction.
-                now = time.monotonic()
-                expired_keys = [k for k, (exp, _) in self._cache.items() if exp < now]
-                if expired_keys:
-                    del self._cache[expired_keys[0]]
-                else:
-                    del self._cache[next(iter(self._cache))]
-            self._cache[cache_key] = (time.monotonic() + cache_seconds, payload)
+            with self._lock:
+                # TTLCache auto-evicts by LRU when at maxsize.
+                self._cache[cache_key] = (time.monotonic() + cache_seconds, payload)
+            logger.debug("cache stored: %s (size=%d)", endpoint, len(self._cache))
         return payload
 
     def _deribit_get(
@@ -383,6 +395,7 @@ class DeribitClient:
             bid_price = _maybe_float(summary.get("bid_price"))
             ask_price = _maybe_float(summary.get("ask_price"))
             mark_price = _maybe_float(summary.get("mark_price"))
+            mid_price: float | None
             if bid_price is not None and ask_price is not None:
                 mid_price = 0.5 * (bid_price + ask_price)
             else:

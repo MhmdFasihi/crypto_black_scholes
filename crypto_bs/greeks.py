@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 from scipy.stats import norm
+
+logger = logging.getLogger(__name__)
 
 _MIN_T = 1.0 / 8760.0  # one hour in years
 

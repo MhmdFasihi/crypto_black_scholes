@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from .black_scholes import BlackScholesModel, OptionParameters, OptionType
 
@@ -71,6 +74,7 @@ class VolatilitySurface:
         if "dividend_yield" in clean.columns:
             clean["dividend_yield"] = clean["dividend_yield"].fillna(0.0)
 
+        logger.debug("fitting surface with %d rows", len(clean))
         self._by_t = {}
         self._raw_by_t = {}
         term = {}
@@ -99,6 +103,9 @@ class VolatilitySurface:
             term[t_float] = float(smile.loc[atm_idx, "implied_volatility"])
         self._term = pd.Series(term).sort_index()
         self._spot = pd.Series(spot).sort_index()
+        logger.info("surface fitted: %d maturities, %d total strikes",
+                    len(self._by_t),
+                    sum(len(v) for v in self._by_t.values()))
 
     def _reference_spot_from_frame(self, frame: pd.DataFrame) -> float | None:
         if "underlying_price" not in frame.columns:
@@ -115,6 +122,10 @@ class VolatilitySurface:
         x = g["strike"].to_numpy(dtype=float)
         y = g["implied_volatility"].to_numpy(dtype=float)
         if len(x) > 1 and (strike < x.min() or strike > x.max()):
+            logger.warning(
+                "StrikeOutOfRangeError: strike=%.4f outside [%.4f, %.4f] for T=%.6f",
+                strike, x.min(), x.max(), t,
+            )
             raise StrikeOutOfRangeError(
                 f"Strike {strike:.4f} is outside the fitted range "
                 f"[{x.min():.4f}, {x.max():.4f}] for T={t:.6f}. "
@@ -372,6 +383,7 @@ class VolatilitySurface:
             "put_strike": float(q_low),
             "call_strike": float(q_high),
             "atm_iv": float(atm_iv),
+            "nearest_fitted_maturity": float(nearest_t),
             "risk_reversal": float(call_iv - put_iv),
             "skew": float(put_iv - call_iv),
             "butterfly": float(0.5 * (put_iv + call_iv) - atm_iv),

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
-from .black_scholes import BlackScholesModel, OptionParameters, OptionType
-
+logger = logging.getLogger(__name__)
 
 REQUIRED_COLUMNS = {
     "strike",
@@ -17,6 +18,8 @@ REQUIRED_COLUMNS = {
     "option_type",
     "open_interest",
 }
+
+_MIN_T = 1.0 / 8760.0
 
 
 def _validate_chain_df(chain_df: pd.DataFrame) -> None:
@@ -51,38 +54,66 @@ def compute_gex(
     if dealer_convention not in {"short_gamma", "long_gamma"}:
         raise ValueError("dealer_convention must be 'short_gamma' or 'long_gamma'")
 
-    bs = BlackScholesModel()
-    opt_types = chain_df["option_type"].str.lower()
+    opt_types = chain_df["option_type"].astype(str).str.lower()
     if not opt_types.isin({"call", "put"}).all():
         raise ValueError("option_type must be call or put")
 
-    def _row_gex(row: pd.Series) -> tuple[float, float, float]:
-        opt = str(row["option_type"]).lower()
-        params = OptionParameters(
-            spot_price=float(row.get("spot_price", spot)),
-            strike_price=float(row["strike"]),
-            time_to_maturity=float(row["time_to_maturity"]),
-            volatility=float(row["volatility"]),
-            risk_free_rate=float(row.get("risk_free_rate", r)),
-            option_type=OptionType.CALL if opt == "call" else OptionType.PUT,
-            is_coin_based=bool(row.get("is_coin_based", False)),
-        )
-        gma = bs.calculate_option_price(params).gamma
-        oi = float(row["open_interest"])
-        if dealer_convention == "short_gamma":
-            sign = 1.0 if opt == "call" else -1.0
-        else:
-            sign = -1.0 if opt == "call" else 1.0
-        return gma, oi, sign * oi * gma * (spot**2) * contract_size
+    n_rows = len(chain_df)
+    row_spot = (
+        chain_df["spot_price"].astype(float).to_numpy()
+        if "spot_price" in chain_df.columns
+        else np.full(n_rows, float(spot))
+    )
+    strikes = chain_df["strike"].astype(float).to_numpy()
+    times = chain_df["time_to_maturity"].astype(float).to_numpy()
+    vols = chain_df["volatility"].astype(float).to_numpy()
+    open_interest = chain_df["open_interest"].astype(float).to_numpy()
+    risk_free_rate = (
+        chain_df["risk_free_rate"].astype(float).to_numpy()
+        if "risk_free_rate" in chain_df.columns
+        else np.full(n_rows, float(r))
+    )
+    dividend_yield = (
+        chain_df["dividend_yield"].astype(float).to_numpy()
+        if "dividend_yield" in chain_df.columns
+        else np.zeros(n_rows, dtype=float)
+    )
+    is_coin_based = (
+        chain_df["is_coin_based"].fillna(False).astype(bool).to_numpy()
+        if "is_coin_based" in chain_df.columns
+        else np.zeros(n_rows, dtype=bool)
+    )
 
-    results = chain_df.apply(_row_gex, axis=1)
+    if np.any(row_spot <= 0) or np.any(strikes <= 0):
+        raise ValueError("spot_price and strike must be positive")
+    if np.any(times < 0):
+        raise ValueError("time_to_maturity cannot be negative")
+    if np.any(vols <= 0):
+        raise ValueError("volatility must be positive")
+
+    t_eff = np.maximum(times, _MIN_T)
+    sqrt_t = np.sqrt(t_eff)
+    d1 = (
+        np.log(row_spot / strikes)
+        + (risk_free_rate - dividend_yield + 0.5 * vols**2) * t_eff
+    ) / (vols * sqrt_t)
+
+    gamma_usd = np.exp(-dividend_yield * t_eff) * norm.pdf(d1) / (row_spot * vols * sqrt_t)
+    delta_usd = np.exp(-dividend_yield * t_eff) * norm.cdf(d1)
+    gamma_coin = gamma_usd / row_spot - 2.0 * delta_usd / (row_spot**2)
+    gamma_values = np.where(is_coin_based, gamma_coin, gamma_usd)
+
+    call_sign = np.where(opt_types.to_numpy() == "call", 1.0, -1.0)
+    signs = call_sign if dealer_convention == "short_gamma" else -call_sign
+    gex_values = signs * open_interest * gamma_values * (spot**2) * contract_size
+
     details = pd.DataFrame(
         {
-            "strike": chain_df["strike"].astype(float).values,
+            "strike": strikes,
             "option_type": opt_types.values,
-            "open_interest": chain_df["open_interest"].astype(float).values,
-            "gamma": [r[0] for r in results],
-            "gex": [r[2] for r in results],
+            "open_interest": open_interest,
+            "gamma": gamma_values,
+            "gex": gex_values,
         }
     )
     grouped = (
@@ -122,7 +153,7 @@ def find_gamma_flip(gex_df: pd.DataFrame) -> Optional[float]:
     return None
 
 
-def gex_summary(gex_df: pd.DataFrame, spot: float) -> Dict[str, Optional[float]]:
+def gex_summary(gex_df: pd.DataFrame, spot: float) -> dict[str, float | str | bool | None]:
     """Return summary stats for a computed GEX dataframe."""
     if gex_df.empty:
         return {

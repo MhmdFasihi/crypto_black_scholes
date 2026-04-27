@@ -20,9 +20,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
-          pip install pytest
-      - name: Run tests
-        run: pytest -q
+          pip install pytest pytest-cov
+      - name: Run tests with coverage
+        run: pytest -q --cov=crypto_bs --cov-report=term-missing --cov-fail-under=80
 
   publish-testpypi:
     name: Publish to TestPyPI (on main)

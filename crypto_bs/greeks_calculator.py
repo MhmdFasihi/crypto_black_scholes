@@ -1,7 +1,5 @@
 # Copyright (c) 2025 Seyed Mohammad Hossein Fasihi (Mhmd Fasihi)
-# This file is part of a project licensed under AGPLv3 or a commercial license.
-# AGPLv3: https://www.gnu.org/licenses/agpl-3.0.html
-# Contact for commercial licensing: mhmd.fasihi@gmail.com
+# Licensed under the MIT License - see the LICENSE file in the repository root.
 
 """
 Greeks Calculator Module with Portfolio-Level Analysis
@@ -36,7 +34,7 @@ class GreeksProfile:
     vanna: Optional[float] = None  # Delta/Vega cross
     vomma: Optional[float] = None  # Vega derivative
     
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> Dict[str, Optional[float]]:
         """Convert to dictionary."""
         return {
             'delta_usd': self.delta_usd,
@@ -228,7 +226,7 @@ class GreeksCalculator:
                 strike_price=position['strike_price'],
                 time_to_maturity=position['time_to_maturity'],
                 volatility=position['volatility'],
-                risk_free_rate=position.get('risk_free_rate', 0.05),
+                risk_free_rate=position.get('risk_free_rate', 0.0),
                 option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                 is_coin_based=position.get('is_coin_based', False)
             )
@@ -336,7 +334,7 @@ class GreeksCalculator:
         gamma_exposure = portfolio_greeks.total_gamma * avg_spot * avg_spot / 100
         
         # Find maximum gamma strike
-        gamma_by_strike = {}
+        gamma_by_strike: dict[float, float] = {}
         for position in positions:
             strike = position['strike_price']
             params = OptionParameters(
@@ -344,7 +342,7 @@ class GreeksCalculator:
                 strike_price=strike,
                 time_to_maturity=position['time_to_maturity'],
                 volatility=position['volatility'],
-                risk_free_rate=position.get('risk_free_rate', 0.05),
+                risk_free_rate=position.get('risk_free_rate', 0.0),
                 dividend_yield=position.get('dividend_yield', 0.0),
                 option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                 is_coin_based=position.get('is_coin_based', False)
@@ -362,7 +360,7 @@ class GreeksCalculator:
                     strike_price=p['strike_price'],
                     time_to_maturity=p['time_to_maturity'],
                     volatility=p['volatility'],
-                    risk_free_rate=p.get('risk_free_rate', 0.05),
+                    risk_free_rate=p.get('risk_free_rate', 0.0),
                     dividend_yield=p.get('dividend_yield', 0.0),
                     option_type=OptionType.CALL if p['option_type'].lower() == 'call' else OptionType.PUT,
                     is_coin_based=p.get('is_coin_based', False)
@@ -386,7 +384,7 @@ class GreeksCalculator:
                         strike_price=position['strike_price'],
                         time_to_maturity=position['time_to_maturity'],
                         volatility=position['volatility'],
-                        risk_free_rate=position.get('risk_free_rate', 0.05),
+                        risk_free_rate=position.get('risk_free_rate', 0.0),
                         dividend_yield=position.get('dividend_yield', 0.0),
                         option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                         is_coin_based=position.get('is_coin_based', False)
@@ -440,7 +438,7 @@ class GreeksCalculator:
                     strike_price=position['strike_price'],
                     time_to_maturity=position['time_to_maturity'],
                     volatility=position['volatility'],
-                    risk_free_rate=position.get('risk_free_rate', 0.05),
+                    risk_free_rate=position.get('risk_free_rate', 0.0),
                     dividend_yield=position.get('dividend_yield', 0.0),
                     option_type=OptionType.CALL if position['option_type'].lower() == 'call' else OptionType.PUT,
                     is_coin_based=position.get('is_coin_based', False)
@@ -463,7 +461,7 @@ class GreeksCalculator:
 # Convenience functions
 def calculate_option_greeks(spot: float, strike: float, time_to_maturity: float,
                            volatility: float, option_type: str = 'call',
-                           is_coin_based: bool = False) -> Dict[str, float]:
+                           is_coin_based: bool = False) -> Dict[str, Optional[float]]:
     """
     Quick Greeks calculation for a single option.
     

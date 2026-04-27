@@ -164,3 +164,9 @@ def test_vol_of_vol_affects_var_magnitude():
     ).value_at_risk
     # Higher vol_of_vol should generally produce larger tail risk
     assert var_high >= var_low * 0.9  # allow small numerical noise
+
+
+def test_mapping_position_default_risk_free_rate_is_zero():
+    """v1.2 verification: mapping normalization no longer reintroduces r=5%."""
+    position = PortfolioPosition.from_mapping(_sample_portfolio()[0])
+    assert position.risk_free_rate == 0.0
