@@ -1,6 +1,24 @@
 
 # Changelog
 
+## [1.3.0] - 2026-04-28
+
+### Changed
+
+- Converted `crypto-bs` into a compatibility redirect package for `qerivative`.
+- `crypto_bs` top-level and legacy submodules now import from `qerivative` and emit
+  `DeprecationWarning`.
+- Package dependencies now point to `qerivative>=2.0.0a1`.
+- `crypto_bs.__version__` reports `1.3.0`, the redirect package version.
+
+### Migration
+
+- Prefer `import qerivative as qd` for new code.
+- Existing `crypto_bs` imports remain available for compatibility during the
+  migration period.
+
+---
+
 ## [1.2.0] — 2026-04-27
 
 ### Added

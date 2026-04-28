@@ -103,6 +103,7 @@ def test_get_iv_surface_data_keeps_only_positive_iv_rows(monkeypatch):
         [
             {
                 "instrument_name": "BTC-01MAY26-100000-C",
+                "settlement": "inverse",
                 "expiry": datetime(2026, 5, 1, 8, 0, tzinfo=timezone.utc),
                 "strike": 100000.0,
                 "time_to_maturity": 21 / 365,
@@ -115,6 +116,7 @@ def test_get_iv_surface_data_keeps_only_positive_iv_rows(monkeypatch):
             },
             {
                 "instrument_name": "BTC-01MAY26-110000-C",
+                "settlement": "inverse",
                 "expiry": datetime(2026, 5, 1, 8, 0, tzinfo=timezone.utc),
                 "strike": 110000.0,
                 "time_to_maturity": 21 / 365,
@@ -127,6 +129,7 @@ def test_get_iv_surface_data_keeps_only_positive_iv_rows(monkeypatch):
             },
             {
                 "instrument_name": "BTC-01MAY26-90000-P",
+                "settlement": "inverse",
                 "expiry": datetime(2026, 5, 1, 8, 0, tzinfo=timezone.utc),
                 "strike": 90000.0,
                 "time_to_maturity": 21 / 365,
@@ -146,6 +149,7 @@ def test_get_iv_surface_data_keeps_only_positive_iv_rows(monkeypatch):
     assert list(surface["instrument_name"]) == ["BTC-01MAY26-100000-C"]
     assert list(surface.columns) == [
         "instrument_name",
+        "settlement",
         "expiry",
         "strike",
         "time_to_maturity",
@@ -228,5 +232,5 @@ def test_user_agent_is_not_hardcoded():
     """NEW-02: User-Agent header does not contain the old hardcoded version string."""
     client = DeribitClient(rate_limit_per_second=0)
     ua = client.session.headers.get("User-Agent", "")
-    assert "crypto_bs/" in ua
+    assert "qerivative/" in ua
     assert "0.9.0" not in ua

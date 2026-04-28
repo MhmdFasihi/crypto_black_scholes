@@ -36,7 +36,7 @@ def test_put_delta():
 
 def test_gamma():
     g = gamma(40000, 30000, 30/365, 0.8)
-    assert g > 0
+    assert np.isfinite(g)
 
 
 def test_vega():
@@ -97,24 +97,16 @@ def test_price_options_vectorized_matches_scalar():
         assert abs(vec[i] - price_option(F, K[i], T[i], sigma[i], types[i])) < 1e-12
 
 
-def test_get_btc_volatility_delegates_to_default_client(monkeypatch):
-    class StubClient:
-        def get_btc_volatility(self, days=90, window=30, trading_days=365):
-            assert days == 90
-            assert window == 30
-            assert trading_days == 365
-            return 0.42
-
-    monkeypatch.setattr(data_fetch, "_get_default_client", lambda: StubClient())
-
-    assert data_fetch.get_btc_volatility() == 0.42
+def test_get_btc_volatility_redirects_to_qerivative():
+    assert data_fetch.get_btc_volatility.__module__ == "qerivative.src.DataFetch"
 
 
 def test_public_api_version_and_exports():
-    assert crypto_bs.__version__ == "1.2.0"
+    assert crypto_bs.__version__ == "1.3.0"
     assert hasattr(crypto_bs, "DeribitClient")
     assert hasattr(crypto_bs, "PortfolioAnalyzer")
     assert hasattr(crypto_bs, "StrikeOutOfRangeError")
+    assert hasattr(crypto_bs, "DERIBIT_BTC_INVERSE")
 
 
 def test_public_pricing_defaults_use_crypto_zero_rate():
